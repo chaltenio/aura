@@ -52,9 +52,11 @@ function save() {
   saveTimer = setTimeout(() => writeFileSync(DB_PATH, JSON.stringify(db)), 50);
 }
 const byId = (id) => db.attendees.find((a) => a.id === id);
+// costume: optional look picked at /register or /me (the list lives in web/costume.js); the server only keeps a short id. 'plain' or junk = none.
+const cleanCostume = (c) => (typeof c === 'string' && /^[a-z]{1,20}$/.test(c) && c !== 'plain' ? c : null);
 const publicCard = (a) => ({
   id: a.id, name: a.name, handle: a.handle || '', blurb: a.blurb || '', linkedin: a.linkedin || '', profile: a.profile && !a.profile.error ? a.profile : null,
-  avatar: a.avatar || null, consent: !!a.consent,
+  avatar: a.avatar || null, consent: !!a.consent, costume: a.costume || null,
   hauntedCount: db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).length,
   huntCount: db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).length,
 });
@@ -87,7 +89,7 @@ app.post('/api/attendee', (req, res) => {
     provider: ['manual', 'csv', 'linkedin', 'github', 'google', 'apple'].includes(provider) ? provider : 'manual', providerId: providerId ? String(providerId).slice(0, 80) : null,
     name: name.trim().slice(0, 60), handle: String(handle || '').trim().slice(0, 60),
     linkedin: /^https?:\/\/(www\.)?linkedin\.com\//.test(String(linkedin || '')) ? String(linkedin).slice(0, 200) : '',
-    blurb: String(blurb || '').trim().slice(0, 200), consent: true,
+    blurb: String(blurb || '').trim().slice(0, 200), consent: true, costume: cleanCostume(body.costume),
     descriptors, avatar: typeof avatar === 'string' && avatar.startsWith('data:image/') && avatar.length < 200_000 ? avatar : null,
     createdAt: Date.now(),
   };
@@ -103,7 +105,7 @@ app.get('/api/version', (_req, res) => res.json({ ...VERSION, startedAt: STARTED
 
 // gallery: only consenting attendees, only what matching needs
 app.get('/api/gallery', (_req, res) => {
-  res.json(db.attendees.filter((a) => a.consent && !a.blocked).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
+  res.json(db.attendees.filter((a) => a.consent && !a.blocked).map((a) => ({ id: a.id, name: a.name, costume: a.costume || null, descriptors: a.descriptors })));
 });
 
 app.get('/api/attendee/:id', async (req, res) => {
@@ -142,6 +144,7 @@ app.patch('/api/attendee/:id', (req, res) => {
   if (typeof req.body.blurb === 'string') a.blurb = req.body.blurb.trim().slice(0, 200);
   if (typeof req.body.handle === 'string') { a.handle = req.body.handle.trim().replace(/^@/, '').slice(0, 60); a.profile = null; ensureProfile(a, save, 0).catch(() => {}); }
   if (typeof req.body.linkedin === 'string') a.linkedin = /^https?:\/\/(www\.)?linkedin\.com\//.test(req.body.linkedin) ? req.body.linkedin.slice(0, 200) : '';
+  if ('costume' in req.body) a.costume = cleanCostume(req.body.costume);
   save();
   broadcast({ type: 'gallery_changed' });
   res.json(publicCard(a));

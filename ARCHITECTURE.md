@@ -46,9 +46,9 @@ Design goals for a 4-hour build:
 
 | Route | Job |
 |---|---|
-| `/register` | OAuth login (its profile photo is the face signature, embedded on-device), consent toggle, selfie capture (optional when the photo has a face), upload |
-| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button |
-| `/me` | your card, who found you, who you found, kill switch ("stop being findable") |
+| `/register` | OAuth login (its profile photo is the face signature, embedded on-device), consent toggle, selfie capture (optional when the photo has a face), optional costume, upload |
+| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face (`web/costume.js`, from the face mesh, on-device) |
+| `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
 Framework: plain Vite + vanilla TS or React, whatever Shelled produces fastest.
 No SSR needed. Everything the camera does must run after a user gesture and over
@@ -139,6 +139,7 @@ CREATE TABLE attendees (
   consent       INTEGER NOT NULL,      -- 1 = findable; 0 = hidden (kept so they can re-enable)
   role          TEXT,                  -- 'hunter' | 'ghost' | 'medium' | 'possessed' (later)
   blurb         TEXT,                  -- "what I'm building today"
+  costume       TEXT,                  -- optional look: 'vampire' | 'witch' | 'demon' | 'ghost' | 'skeleton' | 'pumpkin' (web/costume.js); NULL = plain
   created_at    INTEGER NOT NULL
 );
 
@@ -165,10 +166,10 @@ on a `gallery_changed` socket message).
 | GET, POST | `/auth/:provider/callback` | Provider return (Apple uses `form_post`, so POST). Redirects to `/register` |
 | POST | `/api/session/logout` | Clears the session cookie |
 | GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` |
-| POST | `/api/attendee` | `{name, handle?, blurb?, linkedin?, consent: true, descriptors: [[...]], avatar?}` -> `{id, token}`. A signed-in session fills provider, name, handle, avatar. 400 unless `consent === true` and every descriptor has at least 128 finite numbers |
-| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?}` -> public card. `consent: false` is the kill switch; broadcasts `gallery_changed` |
-| GET | `/api/gallery` | `[{id, name, descriptors}]` for consenting attendees only (the matching set `/hunt` loads). Cards and avatars come from `/api/attendee/:id` |
-| GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, hauntedCount, huntCount`. 404 if unknown |
+| POST | `/api/attendee` | `{name, handle?, blurb?, linkedin?, consent: true, descriptors: [[...]], avatar?, costume?}` -> `{id, token}`. A signed-in session fills provider, name, handle, avatar. 400 unless `consent === true` and every descriptor has at least 128 finite numbers. `costume` is a short lowercase id (`web/costume.js`); anything else, or `'plain'`, stores `null` |
+| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; broadcasts `gallery_changed` |
+| GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (the matching set `/hunt` loads; `costume` so it can draw it the moment a face matches). Cards and avatars come from `/api/attendee/:id` |
+| GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, costume, hauntedCount, huntCount`. 404 if unknown |
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
