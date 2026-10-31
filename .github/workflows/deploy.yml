@@ -16,7 +16,7 @@ jobs:
       - if: steps.tok.outputs.has == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@master
       - if: steps.tok.outputs.has == 'true'
-        run: flyctl deploy --remote-only --ha=false
+        run: flyctl deploy --remote-only --ha=false --build-arg GIT_SHA=${GITHUB_SHA::7}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - if: steps.tok.outputs.has != 'true'

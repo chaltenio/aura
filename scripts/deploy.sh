@@ -34,7 +34,7 @@ case "${1:-deploy}" in
     else
       echo "no secrets staged (no .env and cannot decrypt secrets/prod.enc.env); app runs without API keys"
     fi
-    fly deploy -a "$APP" --remote-only --ha=false
+    fly deploy -a "$APP" --remote-only --ha=false --build-arg GIT_SHA="$(git rev-parse --short HEAD)"
     echo "deployed: $URL"
     for i in 1 2 3 4 5 6; do if curl -fsS "$URL/api/gallery" >/dev/null; then echo "smoke OK: $URL/api/gallery"; exit 0; fi; sleep 5; done
     echo "deployed but /api/gallery not answering yet; check: scripts/deploy.sh logs"; exit 1 ;;
