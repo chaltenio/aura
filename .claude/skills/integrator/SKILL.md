@@ -53,6 +53,8 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    for f in $(git diff --name-only origin/main...HEAD | grep -E '\.m?js$'); do node --check "$f" || exit 1; done
    npm test --silent                # red after a clean-looking rebase = semantic conflict; run the merge skill's checklist (duplicate routes, renamed functions, duplicate ids, TODO STATUS)
    git push -q origin HEAD:main     # fast-forward
+   pr=$(gh pr list --head "$b" --state open --json number --jq '.[0].number')   # deleting the branch closes its PR: say why first (CLAUDE.md)
+   [ -n "$pr" ] && gh pr comment "$pr" --body "Landed on main as $(git rev-parse --short origin/main) by the integrator. The commits were rebased, so GitHub shows this PR as closed, not merged."
    git push -q origin --delete "$b"; git switch -q --detach origin/main; git branch -q -D "merge/$b"
    scripts/bus.sh merged "$b into main ($(git rev-parse --short origin/main)): <one line on what landed>"
    ```

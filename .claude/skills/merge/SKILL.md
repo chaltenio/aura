@@ -67,12 +67,14 @@ export MERGE_SKILL=1
 git push -q -u origin HEAD                          # rebased branch, so reviewers can see it
 git switch main && git pull --ff-only -q origin main
 git merge --ff-only "$branch" && git push -q origin main
+pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')   # deleting the branch closes its PR: say why first (CLAUDE.md)
+[ -n "$pr" ] && gh pr comment "$pr" --body "Landed on main as $(git rev-parse --short origin/main) via /merge. The commits were rebased, so GitHub shows this PR as closed, not merged."
 git branch -d "$branch" && git push -q origin --delete "$branch"
 git switch -c "$(git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')/next" 2>/dev/null || true   # never stay on main
 scripts/bus.sh post "merged $branch into main: <one line on what landed>"
 echo "- $(date '+%Y-%m-%d %H:%M')  merged $branch ($(git rev-parse --short origin/main)) | test: pass | <conflicts resolved, if any>" >> docs/INTEGRATION_LOG.md
 ```
-Commit the INTEGRATION_LOG line on your next branch, not on main. If `--ff-only` fails because main moved while you were resolving, go back to step 2.
+If `git log origin/main..HEAD` is empty after the rebase, the branch was already landed: comment that on its PR and post it on the bus, never `[MERGED]`. Commit the INTEGRATION_LOG line on your next branch, not on main. If `--ff-only` fails because main moved while you were resolving, go back to step 2.
 
 ## 6. When you cannot resolve with confidence
 
