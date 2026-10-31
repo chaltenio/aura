@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAUNT · Calibrate</title><link rel="stylesheet" href="/app.css">
+<style>table{border-collapse:collapse;font-family:ui-monospace,Menlo,monospace;font-size:12px} td,th{border:1px solid #2a2738;padding:4px 6px;text-align:right} th{color:var(--mute)} td.hi{background:#1d4d1d} td.mid{background:#4d3a10} th.row{text-align:left}</style></head>
+<body>
+<h1><span class="ghost">👻</span> Calibrate</h1>
+<p class="mute">Drop several photos (same people from different angles, plus strangers). Shows pairwise similarity so you can pick the threshold for this room's lighting. Nothing is uploaded.</p>
+<div class="panel"><input id="files" type="file" accept="image/*" multiple><div class="status" id="status">Loading face model…</div></div>
+<div class="panel" style="overflow:auto"><table id="matrix"></table></div>
+<p class="hint">Green ≥ threshold (<span id="t"></span>), amber = abstain band. <a href="/">Home</a></p>
+<script type="module" src="/calibrate.js"></script>
+</body></html>
