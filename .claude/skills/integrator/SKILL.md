@@ -23,7 +23,7 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    ```bash
    scripts/bus.sh since
    ```
-   If there is nothing new on main, no open PR changed, and nothing new on the bus, append `no change` to the log line and stop the pass early.
+   If there is nothing new on main, no open PR changed, and nothing new on the bus, say `no change` in chat and stop the pass early. Commit nothing: a no-change commit moves main, and every teammate's next `scripts/sync.sh` then has to rebase or merge for nothing.
 
 2. **List branches ahead of main and nudge stale ones.**
    ```bash

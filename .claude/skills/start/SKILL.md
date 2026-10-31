@@ -68,7 +68,7 @@ scripts/bus.sh claim "#<row> <task>: <files> (@$name)"
 git switch -c "$name/$task"                      # or, if they run parallel sessions:
 # git worktree add "../aura-$task" -b "$name/$task" && echo "cd ../aura-$task && npm install && claude"
 ```
-Edit TODO.md: add or update the row in **Now** with their name in Owner (never touch STATUS; the integrator owns it). Then:
+Edit TODO.md: put their name in the Owner cell of the task's existing row, in place, in whichever table it sits (Now or Next); only a task with no row gets a new row, at the end of Now. Never move rows between tables and never touch STATUS: the integrator writes the same Owner cell from the bus `[CLAIM]`, and only an identical in-place edit merges without a conflict. Then:
 ```bash
 git add TODO.md && git commit -qm "todo: $name claims $task" && scripts/sync.sh --no-test
 ```
