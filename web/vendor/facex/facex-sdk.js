@@ -183,9 +183,10 @@ class FaceXSDK {
 
   _checkSimd() {
     try {
+      // HAUNT patch: upstream bytes declared a wrong body size and failed in Chromium.
+      // This is the wasm-feature-detect SIMD probe (i32.const 0; i8x16.splat; i8x16.popcnt).
       return WebAssembly.validate(new Uint8Array([
-        0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,
-        253,12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11
+        0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
       ]));
     } catch(e) { return false; }
   }
