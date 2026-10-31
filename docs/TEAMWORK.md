@@ -92,3 +92,21 @@ Cost: one more step before your work is visible on main. Benefit: nobody's worki
 ## 9. The steering-agent model
 
 One Claude per person, all steered by the same three things: CLAUDE.md (rules), the bus (what everyone is doing right now), and ARCHITECTURE.md (the contract). Three skills mark the lifecycle of a piece of work: `/start` at the beginning (the SessionStart hook makes every fresh session open with it: state of the room, one question, claim, branch), `/integrator` in the middle (one tab watching main, branches and the bus, nudging), `/merge` at the end (rebase, resolve keeping both intents, fast-forward main). Nobody has to remember the process; their Claude runs it. The person's job is to pick what to build and to say when it works.
+
+## 10. Lifecycle of a task
+
+1. `/start` (automatic in a fresh session): state of the room, one question, pick from IDEAS.md section 3 or TODO.md.
+2. Claim: `scripts/bus.sh claim`, your name in TODO.md Now, branch `<name>/<task>`, or continue your existing branch.
+3. Build in small steps, one commit per working step. Hooks post `[COMMIT]` and `[WORKING]` to the bus for you.
+4. `scripts/sync.sh` after every commit and at least every 15 minutes: rebases onto `origin/main`, runs the test, pushes your branch.
+5. After about 3 commits or 30 minutes the commit hook asks: merge back? Say yes when the step is demoable.
+6. `scripts/bus.sh ready "<branch>: what it does"`. The integrator merges it within a pass, or run `/merge` yourself.
+7. Integrator: rebase, resolve keeping both intents, checks, fast-forward `main`, `[MERGED]`, branch deleted.
+8. A conflict it cannot settle: `[ASK] @you` on the bus naming the files; answer and it retries next pass.
+9. Tick the TODO row; say what you want next and your Claude claims and branches again.
+10. Leaving the keyboard: commit and `scripts/sync.sh`. The Stop hook reminds you if anything is unpushed.
+
+## 11. Automatic gist reporting and the board
+
+Nobody has to narrate. Two hooks post for you: every `git commit` becomes `[COMMIT] <branch>: <subject> (<sha>)` and the first prompt of every ten minutes becomes `[WORKING] <branch>: <first 100 chars>`. `scripts/bus.sh board` prints the last 30 messages grouped by person, so "what is everyone doing" is one command. `[READY]` lines are picked up by the integrator and turn into `[MERGED]` or `[ASK]`. The board is the pinned GitHub issue; if anyone wants a web board with live updates, a Cloudflare Worker mirroring the issue is the upgrade path, not today.
+

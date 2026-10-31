@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 13:05 PT.** Repo is on GitHub (chaltenio/aura, created 12:38 PT today, non-fork). On `main`: docs (README, ARCHITECTURE, RESEARCH, EDGE_CASES template, CLAUDE.md, TEAMWORK, integrator skill). The main session is finishing the face-engine swap to FaceX in `web/` and `server/` (uncommitted, landing shortly). Nothing deployed yet; local server + cloudflared tunnel only. No Shelled run has been made yet. Nobody is blocked.
+**2026-10-31 13:05 PT.** Repo is on GitHub (chaltenio/aura, created 12:38 PT today, non-fork). On `main`: docs (README, ARCHITECTURE, RESEARCH, EDGE_CASES template, CLAUDE.md, TEAMWORK, integrator skill). The main session is finishing the face-engine swap to FaceX in `web/` and `server/` (uncommitted, landing shortly). Nothing deployed yet; local server + cloudflared tunnel only. No Shelled run has been made yet. Nobody is blocked. Backlog lives in IDEAS.md section 3.
 
 ## Now (this hour)
 
