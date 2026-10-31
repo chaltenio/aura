@@ -76,12 +76,16 @@ Read web/common.js, web/me.js, web/hunt.js, web/app.css, RESEARCH.md section A (
 
 Make being haunted unmistakable on iPhone and Android. In common.js: (1) three distinct
 sound effects generated with Web Audio (shriek, bell toll, whisper noise) selectable on
-/me and stored in localStorage; (2) on Android use navigator.vibrate with a pattern,
-feature-detected; (3) a full-screen flash that respects prefers-reduced-motion; (4) show a
+/me and stored in localStorage; (2) on Android use navigator.vibrate with a spooky pattern,
+feature-detected: an irregular rattle or slowing heartbeat (for example [60,40,60,40,200,120,400,300,600]), not one flat buzz; (3) a full-screen flash that respects prefers-reduced-motion; (4) show a
 persistent in-page banner listing who haunted you until dismissed, since iOS Safari has no
 vibration and audio can be muted by the ringer switch; (5) re-arm the AudioContext on
 visibilitychange when the page returns to the foreground, and show a "tap to re-enable
-sound" chip if the context is not running. Add a "Test my alert" button on /me.
+sound" chip if the context is not running; (6) a spooky wobble: a CSS keyframe animation on
+<body> (or a wrapper) that shakes and tilts the whole page with decaying amplitude for about 1.2 s
+(translate a few px, rotate under 1deg, ease out), triggered alongside the flash, disabled under
+prefers-reduced-motion, and working on iOS Safari where there is no vibration at all. Add a
+"Test my alert" button on /me that fires sound, flash, vibrate and wobble together.
 
 Document in a comment why Web Push is not used (iOS requires Home Screen install).
 Do not change server code except, if needed, a GET /api/ping for the test button. Keep
@@ -89,7 +93,8 @@ every change working when the AudioContext fails to construct.
 ```
 
 Expect: agents assuming vibrate works on iOS, audio that only plays after a gesture,
-the ringer switch, reduced-motion.
+the ringer switch, reduced-motion, a wobble that moves fixed-position elements (the flash
+overlay, toasts) or triggers scrollbars, and nobody able to feel whether the pattern is spooky.
 
 ---
 
