@@ -26,17 +26,25 @@ export function connectWs(params, onMessage) {
   return () => { closed = true; ws?.close(); };
 }
 
-// ---- audio: must be unlocked inside a user gesture on iOS ----
+// ---- sound + vibrate: on by default ----
+// A page may only start audio inside a user gesture (iOS always, Chrome until the page is tapped), so every page
+// arms it on its first tap anywhere; nobody has to find an "arm sound" button. Vibrate (Android; iOS Safari has
+// none) does not wait for audio, only for one earlier tap on the page.
 let ctx = null;
 export function unlockAudio() {
   try {
-    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.onstatechange = () => dispatchEvent(new Event('soundchange')); }
     const buf = ctx.createBuffer(1, 1, 22050); const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0);
     if (ctx.state !== 'running') ctx.resume();
   } catch {}
   return ctx;
 }
+/** True once this page can play the shriek; `soundchange` fires on window when it flips. */
+export const soundOn = () => ctx?.state === 'running';
+// skip a touchend that ends a scroll (not a gesture): it would leave a suspended context that shrieks late, on the next tap
+for (const type of ['touchend', 'click', 'keydown']) addEventListener(type, () => { if (!soundOn() && navigator.userActivation?.isActive !== false) unlockAudio(); }, { capture: true, passive: true });
 export function shriek() {
+  if (navigator.vibrate) { try { navigator.vibrate([200, 80, 300]); } catch {} }
   if (!ctx) return;
   try {
     if (ctx.state !== 'running') ctx.resume();
@@ -48,7 +56,6 @@ export function shriek() {
     const n = ctx.createBufferSource(); const nb = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
     n.buffer = nb; const ng = ctx.createGain(); ng.gain.value = 0.25; n.connect(ng).connect(ctx.destination); n.start(t + 0.1);
   } catch {}
-  if (navigator.vibrate) { try { navigator.vibrate([200, 80, 300]); } catch {} }
 }
 export function flash() {
   let el = document.getElementById('flash');

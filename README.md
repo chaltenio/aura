@@ -20,7 +20,7 @@ npm test             # API smoke test
 scripts/deploy.sh    # Fly.io (see docs/DEPLOY.md)
 ```
 
-Pages: `/register` (3 selfies + consent), `/hunt` (camera -> card -> haunt), `/me` (your card, kill switch),
+Pages: `/register` (LinkedIn photo or 3 selfies, + consent), `/hunt` (camera -> card -> haunt), `/me` (your card, kill switch),
 `/screen` (big screen), `/enroll` (organizer: CSV + photos), `/calibrate` (threshold tuning).
 Optional sign-in appears when `GITHUB_CLIENT_ID/SECRET` or `LINKEDIN_CLIENT_ID/SECRET` are set (see docs/SECRETS.md).
 

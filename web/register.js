@@ -4,7 +4,7 @@ import { api, setMe, unlockAudio, getMe, esc, normLinkedin, normGithub } from '/
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };
 const WANT = 3;
-const samples = []; // { embedding, thumb } per accepted selfie or photo; thumb of the first one becomes the card avatar
+const samples = []; // { embedding, thumb, from? } per accepted selfie or photo (from = sign-in provider); the first thumb becomes the card avatar
 let stream = null; let engine = null;
 const prev = getMe();
 
@@ -13,13 +13,14 @@ const engineReady = loadEngine({ video: false, onProgress: (t) => { if (t !== 'r
   .catch(() => status("The face model didn't load. Check your connection and reload the page."));
 
 function refresh() {
-  const n = samples.length;
+  const n = samples.length, profile = samples.find((s) => s.from), selfies = samples.filter((s) => !s.from).length;
+  $('selfies').querySelector('h2').textContent = profile ? `Face signature: your ${profile.from} photo` : 'Three selfies';
   $('thumbs').innerHTML = Array.from({ length: Math.max(WANT, n) }, (_, i) => samples[i]
     ? `<button class="slot filled" data-i="${i}" aria-label="Remove selfie ${i + 1}"><img src="${samples[i].thumb}" alt=""></button>`
     : `<div class="slot">${i + 1}</div>`).join('');
-  $('capture').textContent = n < WANT ? `Take selfie ${n + 1} of ${WANT}` : 'Take another (optional)';
-  $('start').textContent = n ? '📷 Take more selfies' : '📷 Open selfie camera';
-  $('start').className = n >= WANT ? 'secondary' : ''; // done with selfies: the next step is the box and Register, not more photos
+  $('capture').textContent = profile ? `Take selfie ${selfies + 1} (optional)` : n < WANT ? `Take selfie ${n + 1} of ${WANT}` : 'Take another (optional)';
+  $('start').textContent = profile && !selfies ? '📷 Add a selfie too (optional)' : n ? '📷 Take more selfies' : '📷 Open selfie camera';
+  $('start').className = n >= WANT || profile ? 'secondary' : ''; // enough to register: the next step is the box and Register, not more photos
   const missing = !$('name').value.trim() ? 'Add your name to continue' : !n ? 'Take a selfie to continue' : !$('consent').checked ? 'Tick the box to agree' : '';
   $('submit').disabled = !!missing; $('submit').textContent = missing || 'Register 👻';
 }
@@ -31,14 +32,14 @@ $('thumbs').onclick = (e) => {
   samples.splice(Number(b.dataset.i), 1); refresh(); status(`Removed. ${samples.length} of ${WANT} left.`);
 };
 
-async function addSample(source, label) {
+async function addSample(source, label, from = null) {
   await engineReady; if (!engine) return false;
   status(`Checking ${label}…`);
   const faces = await engine.detect(source);
   if (faces.length === 0) { status(`No face found in ${label}. Face the camera in good light.`); return false; }
   const f = faces[0];
   if (f.box[2] < 60 || f.box[3] < 60) { status(`Your face is too small in ${label}. Come closer.`); return false; }
-  samples.push({ embedding: f.embedding, thumb: cropFace(source, f.box) });
+  samples.push({ embedding: f.embedding, thumb: cropFace(source, f.box), ...(from && { from }) });
   const n = samples.length, many = faces.length > 1 ? ' More than one face there: kept the biggest.' : '';
   status(n < WANT ? `Got ${n} of ${WANT}.${many} Turn your head a little for the next one.` : `Got ${n}. Looking good.${many}`);
   refresh(); return true;
@@ -83,7 +84,7 @@ if (prev) { $('already').hidden = false; $('already').innerHTML = `This phone is
 refresh();
 
 // Optional sign-in (buttons appear only when the server has provider credentials); a session pre-fills the form
-// and offers the profile photo as one face sample.
+// and its profile photo becomes the face signature, so selfies are optional.
 (async () => {
   try {
     const providers = await api('/api/auth/providers');
@@ -101,11 +102,18 @@ refresh();
       if (!$('name').value) $('name').value = session.name || '';
       if (!$('handle').value) $('handle').value = session.handle || '';
       refresh();
-      if (session.avatar) {
-        const b = document.createElement('button'); b.className = 'secondary'; b.textContent = 'Use my profile photo as a face sample';
-        b.onclick = async () => { b.disabled = true; const img = new Image(); img.src = session.avatar; await img.decode(); await addSample(img, 'profile photo'); };
-        $('auth-buttons').appendChild(b);
-      }
+      if (session.avatar) await useProfilePhoto(session.avatar, labels[session.provider] || 'profile');
     }
   } catch {}
 })();
+
+// Sign-in photos are small (LinkedIn sends 100x100), so draw them at 400 px or more before detecting; the face then
+// clears addSample's 60 px minimum. With a face found, selfies become optional; without one, the selfie flow is unchanged.
+async function useProfilePhoto(src, from) {
+  const img = new Image(); img.src = src; await img.decode();
+  const k = Math.max(1, 400 / Math.min(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, c.width, c.height);
+  if (!(await addSample(c, `your ${from} photo`, from))) { status(`No clear face in your ${from} photo. Take a selfie below instead.`); return; }
+  status(`Using your ${from} photo as your face signature, no selfie needed. A selfie or two helps phones match you in a dark room.`);
+}
