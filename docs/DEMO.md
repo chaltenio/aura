@@ -25,6 +25,7 @@
 - **Privacy / consent?** Opt-in toggle at registration, gallery only serves consenting people, kill switch is immediate, server data is deleted after the event, no face ever goes to a hosted model (Anthropic policy and our rule).
 - **Why not an app?** One URL, works in iOS Safari and Android Chrome, nobody installs anything at a conference.
 - **Lookalikes / twins?** Abstain band and 3-frame vote; a wrong name on a stranger is the failure we tuned against.
+- **What do I get out of it?** /me lists tonight's connections with GitHub/LinkedIn links; one tap copies them.
 - **Where do the agents come in?** Shelled built features X and Y (see EDGE_CASES.md); the matchmaker / narrator (if landed) use Claude for names and events only.
 
 ## Proof of launch (rules require one)
