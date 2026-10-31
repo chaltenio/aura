@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HAUNT · Hunt</title><link rel="stylesheet" href="/app.css"></head>
+<body>
+<h1><span class="ghost">👻</span> Hunt</h1>
+<div class="video-wrap" id="wrap"><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
+<button id="start">Start hunting</button>
+<div class="status" id="status">Loading face model…</div>
+<details><summary class="hint">Test with a photo</summary><input id="testfile" type="file" accept="image/*"></details>
+<p class="hint"><a href="/me">My card</a> · <a href="/">Home</a></p>
+<div class="sheet" id="sheet">
+  <div class="card"><img id="c-avatar" hidden><div class="noavatar" id="c-noavatar">👤</div><div><div class="name" id="c-name"></div><div class="handle" id="c-handle"></div><div class="blurb" id="c-blurb"></div><div class="sim" id="c-sim"></div></div></div>
+  <button id="haunt">👻 Haunt them</button>
+  <button class="secondary" id="dismiss">Dismiss</button>
+</div>
+<script type="module" src="/hunt.js"></script>
+</body></html>

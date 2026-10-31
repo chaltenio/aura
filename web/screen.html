@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAUNT · Screen</title><link rel="stylesheet" href="/app.css"></head>
+<body class="screen">
+<h1><span class="ghost">👻</span> HAUNT <span class="mute" style="font-size:16px">scan to join</span></h1>
+<div class="screen-grid">
+  <div>
+    <div class="grid"><div class="panel"><div class="big" id="n-people">0</div><div class="mute">findable people</div></div><div class="panel"><div class="big" id="n-haunts">0</div><div class="mute">hauntings</div></div></div>
+    <h2>Live</h2><ul class="feed" id="feed"></ul>
+  </div>
+  <div>
+    <div class="panel qr" id="qr"></div>
+    <h2>Most haunted</h2><ul class="feed" id="top-haunted"></ul>
+    <h2>Top hunters</h2><ul class="feed" id="top-hunters"></ul>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script type="module" src="/screen.js"></script>
+</body></html>

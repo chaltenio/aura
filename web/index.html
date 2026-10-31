@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HAUNT</title><link rel="stylesheet" href="/app.css"></head>
+<body>
+<h1><span class="ghost">👻</span> HAUNT</h1>
+<p>Point your phone at someone in the room and know who they are. Opt-in only. Faces never leave your phone.</p>
+<div class="panel">
+  <a href="/register"><button>Register (be findable)</button></a>
+  <a href="/hunt"><button class="secondary">Hunt</button></a>
+  <a href="/me"><button class="secondary">My card</button></a>
+  <a href="/screen" class="hint">Big screen view</a>
+</div>
+<div class="panel qr" id="qr"></div>
+<p class="hint">Scan the QR with another phone to join.</p>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>const q = qrcode(0, 'M'); q.addData(location.origin + '/register'); q.make(); document.getElementById('qr').innerHTML = q.createSvgTag({ cellSize: 6, margin: 2 });</script>
+</body></html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HAUNT · Register</title><link rel="stylesheet" href="/app.css"></head>
+<body>
+<h1><span class="ghost">👻</span> Be findable</h1>
+<p class="mute">Other players' phones will be able to recognize your face in this room, during this event. You can turn it off any time.</p>
+<div class="panel">
+  <label for="name">Name</label><input id="name" type="text" autocomplete="name" placeholder="Ada Lovelace" maxlength="60">
+  <label for="handle">GitHub or LinkedIn handle (optional)</label><input id="handle" type="text" autocapitalize="none" placeholder="adalovelace" maxlength="60">
+  <label for="blurb">What are you building today? (optional)</label><textarea id="blurb" maxlength="200" placeholder="A haunted conference app"></textarea>
+  <div class="check"><input id="consent" type="checkbox"><label for="consent" style="margin:0">I agree that other attendees' phones can recognize my face during this event. Only a face signature (not photos) is uploaded, and I can delete it from <b>My card</b>.</label></div>
+</div>
+<div class="panel">
+  <h2>Face signature (3 selfies)</h2>
+  <div class="video-wrap mirror" id="wrap" hidden><video id="video" autoplay muted playsinline></video></div>
+  <button id="start">Start selfie camera</button>
+  <button id="capture" hidden>Capture (<span id="n">0</span>/3)</button>
+  <label for="files" class="hint">Or use photos of your face instead</label><input id="files" type="file" accept="image/*" multiple>
+  <div class="thumbs" id="thumbs"></div>
+  <div class="status" id="status">Loading face model…</div>
+</div>
+<button id="submit" disabled>Register</button>
+<p class="hint"><a href="/">Back</a></p>
+<script type="module" src="/register.js"></script>
+</body></html>

@@ -1,0 +1,49 @@
+:root { --bg:#0b0a10; --panel:#16141f; --ink:#ece7f5; --mute:#9a93ad; --accent:#ff6a00; --ok:#7CFF6B; --bad:#ff4d6d; --glow:#b14cff; }
+* { box-sizing: border-box; }
+html, body { margin:0; background:var(--bg); color:var(--ink); font: 16px/1.4 -apple-system, system-ui, Segoe UI, Roboto, sans-serif; -webkit-text-size-adjust:100%; }
+body { padding: 16px; max-width: 720px; margin: 0 auto; }
+h1 { font-size: 28px; margin: 8px 0 4px; letter-spacing: .5px; }
+h1 .ghost { color: var(--glow); }
+h2 { font-size: 18px; margin: 20px 0 8px; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+.mute { color: var(--mute); font-size: 14px; }
+.panel { background: var(--panel); border-radius: 14px; padding: 14px; margin: 12px 0; }
+label { display:block; margin: 10px 0 4px; color: var(--mute); font-size: 14px; }
+input[type=text], textarea { width:100%; padding: 12px; border-radius: 10px; border: 1px solid #2a2738; background:#0f0e16; color: var(--ink); font-size: 16px; }
+textarea { min-height: 64px; }
+.check { display:flex; gap:10px; align-items:flex-start; margin: 14px 0; font-size: 15px; }
+.check input { width: 22px; height: 22px; margin-top: 2px; flex: none; }
+button { appearance:none; border:0; border-radius: 12px; padding: 14px 18px; font-size: 17px; font-weight: 600; background: var(--accent); color:#120800; width:100%; margin: 8px 0; }
+button.secondary { background:#2a2738; color: var(--ink); }
+button.danger { background: var(--bad); color:#fff; }
+button:disabled { opacity:.45; }
+.row { display:flex; gap: 10px; }
+.row > * { flex:1; }
+.status { font-size: 13px; color: var(--mute); font-family: ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+.video-wrap { position: relative; width: 100%; background:#000; border-radius: 14px; overflow:hidden; aspect-ratio: 3/4; }
+.video-wrap video, .video-wrap canvas { position:absolute; inset:0; width:100%; height:100%; object-fit: cover; }
+.video-wrap.mirror video, .video-wrap.mirror canvas { transform: scaleX(-1); }
+.thumbs { display:flex; gap:8px; margin-top: 8px; min-height: 64px; }
+.thumbs img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 2px solid var(--ok); }
+.card { display:flex; gap: 12px; align-items:center; }
+.card img, .card .noavatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background:#2a2738; flex:none; display:grid; place-items:center; font-size: 28px; }
+.card .name { font-size: 20px; font-weight: 700; }
+.card .handle { color: var(--accent); font-size: 14px; }
+.card .blurb { color: var(--mute); font-size: 14px; }
+.sheet { position: fixed; left:0; right:0; bottom:0; background: var(--panel); border-radius: 18px 18px 0 0; padding: 16px 16px 28px; box-shadow: 0 -8px 40px #000a; transform: translateY(110%); transition: transform .25s ease; z-index: 20; }
+.sheet.show { transform: translateY(0); }
+.sim { font-family: ui-monospace, Menlo, monospace; color: var(--mute); font-size: 13px; }
+#flash { position: fixed; inset: 0; background: var(--glow); opacity: 0; pointer-events: none; z-index: 50; }
+#flash.on { animation: flash 1.2s ease-out; }
+@keyframes flash { 0% {opacity:.95} 15% {opacity:.2} 30% {opacity:.9} 100% {opacity:0} }
+.toast { position: fixed; top: 12px; left: 12px; right: 12px; background: #2a1033; border: 1px solid var(--glow); color: var(--ink); padding: 12px 14px; border-radius: 12px; z-index: 60; display:none; }
+.toast.show { display:block; }
+.feed { list-style:none; padding:0; margin:0; }
+.feed li { padding: 10px 0; border-bottom: 1px solid #221f2e; }
+.feed time { color: var(--mute); font-size: 12px; margin-left: 6px; }
+.big { font-size: 44px; font-weight: 800; }
+.grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (min-width: 900px) { .screen-grid { display:grid; grid-template-columns: 1.2fr 1fr; gap: 24px; } body.screen { max-width: 1400px; } }
+.qr svg { width: 100%; max-width: 280px; height:auto; background:#fff; padding: 8px; border-radius: 12px; }
+.hint { font-size: 13px; color: var(--mute); }
