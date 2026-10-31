@@ -4,7 +4,7 @@ Point your phone at someone in the room and know who they are. Opt-in, on-device
 Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing what).
 
 
-Open Claude with `npm run go` (submits the start prompt for you; the interview, claim and branch happen before you type anything).
+Open Claude with plain `claude` after a one-time `scripts/install-launcher.sh` (makes bare `claude` in this repo submit the start prompt), or `npm run go`; either way the interview, claim and branch happen before you type anything.
 
 ## Where to find work
 - **IDEAS.md section 3** ("Ideas that fit and are free for another teammate to take"): the backlog of pickable, independent features, each with effort and sponsor track. Start there.
