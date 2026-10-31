@@ -206,3 +206,65 @@ https://bugs.webkit.org/show_bug.cgi?id=301627 , https://howaiworks.ai/blog/tran
 ### Use this
 
 **@vladmandic/human**, wasm backend, ~320 px input, 3 to 5 fps. Enrol with 3 selfies -> centroid 1024-d vector stored with the profile. Ship all opt-in embeddings to `/hunt` as one JSON; match client-side at ≥ 0.5 with 3-frame voting and lazo's abstain band. Keep **DeepFace Docker** as the 20-minute fallback (POST a JPEG every ~500 ms, match server-side).
+
+---
+
+## E. Sponsor tracks: rules, minimal paths, proof
+
+**The official rules page overrides the track blurbs:** https://strangerbuilds.com/rules
+
+### Global rules that bite
+
+- Project must start after Fri 30 Oct 23:00 UTC, in a **new non-forked repo** created after that. (This repo qualifies.)
+- Submissions close Sun 8 Nov 23:59 ART. "Best of the Day" SF cut is **16:10 local today**.
+- Registration: Luma signup, "sign the pact", and activate **"the Duck on ASI:One"** (an ASI:One account is mandatory for everyone). App: https://app.strangerbuilds.com/home
+- **Max 2 challenges open per project, one challenge prize per project.** Sponsor use must be genuine with proof; logos alone don't count.
+- Proof of launch: an X post, or a 2-minute demo/pitch video.
+
+### Shelled AI, "Make coding agents sweat" (Hard problems, judge-confirmed)
+
+- One prompt -> Planner/Builder/Tester/Reviewer agents in sandboxed shells -> one reviewed PR in your repo with plan, tests, reasoning. https://shelled.ai/harness , https://shelled.ai/articles/from-prompt-to-production-a-day-with-shelled
+- App: https://app.shelled.ai (chat: "Ask Louie or describe your project"). Repo-connection method is **not documented publicly**; expect a GitHub connect inside the app after sign-in.
+- Pricing: Open $0 self-host, Plus $25/mo with free trial, Pro $250. https://shelled.ai/harness#pricing
+- **No public GitHub org exists** (every plausible name 404s). The "PR to their repo" route is dead; use the **Shelled run** route only.
+- EDGE_CASES.md: no template published. Rules call it "an edge-case report (where agents shone and where they broke)". Rules also say PRs appear "with the run behind each", so **put the run link/ID in every PR description.**
+- Founder posts: https://x.com/binaryreality/status/2113132592874840185 , https://x.com/binaryreality/status/2116374995194740871
+- Gotcha: unverified whether a run works on an existing repo or only scaffolds new projects. Plan for Shelled to build a feature branch/PR, and budget time for sign-up friction with no docs to fall back on.
+
+### TrueFoundry TrueForge, "Build a self-improving agent" (Hard problems, judge-confirmed)
+
+- MIT open-source agent harness: models + MCP tools + skills + sandbox + sessions, chat UI, HTTP API/TS SDK. https://github.com/truefoundry/trueforge , docs https://trueforge.dev , quickstart https://trueforge.dev/quickstart.md
+- Local: Node 22.14+, `npx @truefoundry/trueforge@latest`, open http://localhost:8790, Settings -> Models -> add Anthropic key, Build Agent -> instructions, MCP servers, skills -> Save -> Try.
+- Hosted: https://signup.truefoundry.com/signup , Developer plan $0 (3 users, 10K req/user/month). Agent Harness is under TRUEFORGE -> Build Agents; **unverified whether it's enabled on the free tier.** https://www.truefoundry.com/docs/agent-platform/agent-harness/overview
+- Runs: each chat is a Session with turns, duration, tokens, tool calls, errors, and a copyable session ID. No compare view or sessions API; **screenshot both sessions.** https://trueforge.dev/sessions.md
+- **Rules wording:** "a later run that improves on run 1 by changing its own skills or instructions." So run 1 must produce or modify a skill/instructions, run 2 must use them and do measurably better (fewer tool calls/tokens/errors, or a task score you define). The Demogorgon's memory file (RESEARCH.md section C) is that artifact.
+- Gotchas: old TrueFoundry Agents API deprecated 2026-10-15, use TrueForge only. Sandbox skills need a Daytona API key.
+
+### Fetch.ai, "Get your agent hired" (Real users, GitHub repo required)
+
+- Minimal agent: `pip install uagents openai`; `Agent(name, seed, port=8001, mailbox=True, publish_agent_details=True)`; `Protocol(spec=chat_protocol_spec)`; reply with `ChatAcknowledgement` then `ChatMessage(TextContent + EndSessionContent)`; `agent.include(protocol, publish_manifest=True)`. Full example: https://uagents.fetch.ai/docs/examples/asi-1
+- Register: run the agent, open the Agent Inspector link from the log, Connect -> **Mailbox** (no public endpoint needed), Agent Profile -> name + @handle (max 20 chars), README, description, avatar, keywords -> "Chat with Agent" to test in ASI:One. https://docs.agentverse.ai/documentation/agent-discovery/setup-guide , README template https://docs.agentverse.ai/documentation/agent-discovery/readme-guidelines
+- ASI:One API: key at https://asi1.ai/dashboard/api-keys , `POST https://api.asi1.ai/v1/chat/completions`, OpenAI-compatible, models `asi1`, `asi1-mini`, `asi1-ultra`. https://innovationlab.fetch.ai/resources/docs/asione/asi-one-quickstart
+- Timing: registration is immediate; only **running** agents are prioritized in search, 10+ interactions recommended. **Keep the process alive during judging.** Log in every 30 days to keep the mailbox.
+- Rules nuance: the feedback tries must be made **through ASI:One chat**. Cheap extra: the innovationlab shields.io badge in the README (required at other Fetch hackathons).
+
+### Base44, "Find the money" (Real users)
+
+- Build from chat at app.base44.com; Publish gives the public link. https://docs.base44.com/Getting-Started/app-editor-overview
+- App ID is in the editor URL `app.base44.com/apps/<app_id>/editor`. Version history icon above the AI chat.
+- Proof: app ID + **dated Version history screenshot showing the first version** + editor screenshot with app ID and your account. Take the first screenshot early.
+- Stripe needs the Builder plan ($40 to 50/mo), checkout only works on the **published** app. https://docs.base44.com/Integrations/Stripe-integration
+- Free plan: ~5 messages/day. Too few for a real build; needs a paid plan or sponsor credits (ask in https://strangerbuilds.com/slack). Phone-camera face recognition inside Base44 is unverified.
+
+### Decision for HAUNT (max 2 challenges)
+
+Open **Shelled** (the whole build runs through it) plus **one** of:
+
+- **Fetch.ai** (Real users): the matchmaker uAgent, ~1 hour, needs 3 tries through ASI:One. Lower risk.
+- **TrueForge** (Hard problems): the Demogorgon localizer with a memory file, run 1 vs run 2 screenshots. Higher payoff, more build.
+
+Skip Base44 for this project. Submit for the 16:10 SF "Best of the Day" cut if in SF.
+
+### Could not verify
+
+Shelled's repo-connection mechanics and model list; whether TrueForge Agent Harness is on TrueFoundry's free tier; ASI:One free credits; Agentverse indexing latency; Base44's current official prices.

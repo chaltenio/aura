@@ -27,6 +27,10 @@ No app install. One URL, works in iOS Safari and Android Chrome.
 
 ## Tracks this build targets
 
-- Shelled AI "Make coding agents sweat": built via Shelled runs, 2+ PRs, EDGE_CASES.md
-- Fetch.ai "Get your agent hired": matchmaker agent on Agentverse
-- Stranger Builds community cup
+Rules (https://strangerbuilds.com/rules): max 2 challenges per project, one prize.
+
+- Shelled AI "Make coding agents sweat": built via Shelled runs, 2+ PRs (run link in each), EDGE_CASES.md
+- Second track, pick one: Fetch.ai "Get your agent hired" (matchmaker agent on Agentverse, 3 tries via ASI:One) or TrueForge "Build a self-improving agent" (Demogorgon photo-to-zone localizer, run 2 beats run 1)
+- Stranger Builds community cup (free)
+
+Hard constraint: no face ever goes to a hosted LLM (Anthropic policy). Face ID is on-device only.
