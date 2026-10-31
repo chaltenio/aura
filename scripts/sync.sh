@@ -40,5 +40,6 @@ fi
 if [[ "${1:-}" != "--no-test" && "${SKIP_TEST:-0}" != "1" ]] && node -e 'const p=require("./package.json");process.exit(p.scripts&&p.scripts.test?0:1)' 2>/dev/null; then
   echo "sync: running npm test"; npm test --silent || { echo "sync: TEST FAILED. Fix before pushing (or scripts/sync.sh --no-test for a docs-only change)."; exit 1; }
 fi
-if [[ "$branch" == "main" ]]; then git push -q origin main; else git push -q -u origin HEAD; fi
+push() { git push -q "$@" 2>/dev/null || git push -q "$@"; }   # GitHub sometimes answers "remote rejected (failed)" once
+if [[ "$branch" == "main" ]]; then push origin main; else push -u origin HEAD; fi
 echo "sync: pushed $branch @ $(git log --oneline -1)"

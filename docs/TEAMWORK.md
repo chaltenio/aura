@@ -85,23 +85,23 @@ Ruled out for today: a repo-hosted MCP server (`claude mcp add` per person plus 
 
 Direct-to-main works when two people touch different files. Within the first hour we had three Claude Code sessions on one laptop editing `web/face.js`, `server/index.js`, and the docs at once, plus a fork committing beside them. Edits landed on top of each other's uncommitted work and rebases were impossible with a dirty tree.
 
-The rule now: every session on its own branch `<name>/<task>`, pushed after every commit, landed through `/merge`. `main` only ever moves by fast-forward from a rebased branch, so it is always one person's tested state. The merge resolver (`.claude/skills/merge/SKILL.md`) does the rebase and reads both sides of every conflict instead of picking one; the semantic-conflict checklist there is the part humans skip under time pressure. The integrator lists branches away from main and nudges anyone past 45 minutes.
+The rule now: every session on its own branch `<name>/<task>`, pushed after every commit, landed through `/merge`. `main` only ever moves by fast-forward to a tested branch that already contains it, so it is always one person's tested state. The merge resolver (`.claude/skills/merge/SKILL.md`) brings main in and reads both sides of every conflict instead of picking one; the semantic-conflict checklist there is the part humans skip under time pressure. The integrator lists branches away from main and nudges anyone past 45 minutes.
 
 Cost: one more step before your work is visible on main. Benefit: nobody's working tree is touched by anyone else, ever.
 
 ## 9. The steering-agent model
 
-One Claude per person, all steered by the same three things: CLAUDE.md (rules), the bus (what everyone is doing right now), and ARCHITECTURE.md (the contract). Three skills mark the lifecycle of a piece of work: `/start` at the beginning (the SessionStart hook makes every fresh session open with it: state of the room, one question, claim, branch), `/integrator` in the middle (one tab watching main, branches and the bus, nudging), `/merge` at the end (rebase, resolve keeping both intents, fast-forward main). Nobody has to remember the process; their Claude runs it. The person's job is to pick what to build and to say when it works.
+One Claude per person, all steered by the same three things: CLAUDE.md (rules), the bus (what everyone is doing right now), and ARCHITECTURE.md (the contract). Three skills mark the lifecycle of a piece of work: `/start` at the beginning (the SessionStart hook makes every fresh session open with it: state of the room, one question, claim, branch), `/integrator` in the middle (one tab watching main, branches and the bus, nudging), `scripts/ready.sh` and `/merge` at the end (open the PR, merge main in, resolve keeping both intents, fast-forward main to the PR's head). Nobody has to remember the process; their Claude runs it. The person's job is to pick what to build and to say when it works.
 
 ## 10. Lifecycle of a task
 
 1. `/start` (automatic in a fresh session): state of the room, one question, pick from IDEAS.md section 3 or TODO.md.
 2. Claim: `scripts/bus.sh claim`, your name in TODO.md Now, branch `<name>/<task>`, or continue your existing branch.
 3. Build in small steps, one commit per working step. Hooks post `[COMMIT]` and `[WORKING]` to the bus for you.
-4. `scripts/sync.sh` after every commit and at least every 15 minutes: rebases onto `origin/main`, runs the test, pushes your branch.
-5. After about 3 commits or 30 minutes the commit hook asks: merge back? Say yes when the step is demoable.
-6. `scripts/bus.sh ready "<branch>: what it does"`. The integrator merges it within a pass, or run `/merge` yourself.
-7. Integrator: rebase, resolve keeping both intents, checks, fast-forward `main`, `[MERGED]`, branch deleted.
+4. `scripts/sync.sh` after every commit and at least every 15 minutes: brings `origin/main` in (rebase until the branch is pushed, merge after), runs the test, pushes your branch.
+5. When the job, or a demoable slice of it, works, your Claude runs `scripts/ready.sh "<what it does>"` without asking (the commit hook after about 3 commits and the Stop hook after each new commit remind it): sync, test, push, open or reuse the PR, `[READY]` with its link.
+6. The integrator picks up `[READY]` within a pass, or run `/merge` to land it now.
+7. Landing: merge `origin/main` in (a pushed branch is never rebased), resolve keeping both intents, checks, then `scripts/land.sh` fast-forwards `main` to the PR's head (GitHub shows it merged), deletes the branch, posts `[MERGED]`.
 8. A conflict it cannot settle: `[ASK] @you` on the bus naming the files; answer and it retries next pass.
 9. Tick the TODO row; say what you want next and your Claude claims and branches again.
 10. Leaving the keyboard: commit and `scripts/sync.sh`. The Stop hook reminds you if anything is unpushed.
@@ -109,4 +109,10 @@ One Claude per person, all steered by the same three things: CLAUDE.md (rules), 
 ## 11. Automatic gist reporting and the board
 
 Nobody has to narrate. Two hooks post for you: every `git commit` becomes `[COMMIT] <branch>: <subject> (<sha>)` and the first prompt of every ten minutes becomes `[WORKING] <branch>: <first 100 chars>`. `scripts/bus.sh board` prints the last 30 messages grouped by person, so "what is everyone doing" is one command. `[READY]` lines are picked up by the integrator and turn into `[MERGED]` or `[ASK]`. The board is the pinned GitHub issue; if anyone wants a web board with live updates, a Cloudflare Worker mirroring the issue is the upgrade path, not today.
+
+## 12. Every landing is a PR, opened by the job itself (15:36)
+
+The PR tab was nearly empty: `/merge` pushed main directly, and because it rebased, a PR it landed showed "closed, not merged" (#2). A Shelled PR landed that way could never count as merged. Now the last step of every job is `scripts/ready.sh`, which the session runs by itself (the commit and Stop hooks remind it): sync, test, push, open the branch's PR or reuse it, post `[READY]` with the link. Landing, by `/merge` or the integrator, merges main into the branch instead of rebasing it, and `scripts/land.sh` fast-forwards main to the PR's head. GitHub marks the PR merged, CI shows on it, and the PR list becomes the record of what landed from every laptop.
+
+It is not a review gate: nobody waits for an approval, and the integrator still reviews every commit after it lands. The cost is that merge commits from syncs now reach main; `git log --oneline --no-merges` hides them.
 

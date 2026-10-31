@@ -7,7 +7,8 @@ run behind it; every place the agents guessed wrong becomes an EDGE_CASES.md ent
 
 Setup (once, needs a human): sign in at https://app.shelled.ai, connect GitHub repo
 `chaltenio/aura`, start a run with one of the prompts below. Shelled works on its own
-branch and opens a PR; review it with `/merge` like any other branch.
+branch and opens a PR; review it, then land it with `/merge` like any other branch. `/merge`
+fast-forwards main to the PR's head, so GitHub counts the PR as merged (the track needs one).
 
 Pick features that agents **cannot verify from text**: camera, audio, timing, phones.
 Each prompt is self-contained and names the files to read first.

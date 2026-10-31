@@ -55,3 +55,12 @@ bus_bg() {
   [ -x scripts/bus.sh ] || return 0
   nohup scripts/bus.sh "$1" "$2" >/dev/null 2>&1 &
 }
+
+# json_block "<reason>" : Stop-hook output that keeps Claude going one more step, with <reason> as its instruction
+json_block() { python3 -c 'import json,sys; print(json.dumps({"decision": "block", "reason": sys.argv[1]}))' "$1"; }
+
+# ready_pending <branch> : true when scripts/ready.sh queued this branch and that commit is not on main yet
+ready_pending() {
+  r=$(cat ".bus/ready-$(printf '%s' "$1" | tr '/' '_')" 2>/dev/null) || return 1
+  [ -n "$r" ] && ! git merge-base --is-ancestor "$r" origin/main 2>/dev/null
+}
