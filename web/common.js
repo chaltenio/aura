@@ -17,7 +17,7 @@ export function connectWs(params, onMessage) {
   let ws, closed = false, delay = 500;
   const open = () => {
     ws = new WebSocket(url);
-    ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)); } catch {} };
+    ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'admin_message') toast(`<b>Organizer:</b> ${esc(m.text)}`, 12000); else if (m.type === 'admin_status' && m.blocked) toast('An organizer has paused your access.', 12000); onMessage(m); } catch {} };
     ws.onopen = () => { delay = 500; };
     ws.onclose = () => { if (!closed) setTimeout(open, delay = Math.min(delay * 2, 8000)); };
   };
