@@ -1,5 +1,5 @@
 import { loadEngine, imageFromFile, cropFace } from '/face.js';
-import { api, setMe, unlockAudio, getMe, esc, normLinkedin, normGithub } from '/common.js';
+import { api, setMe, unlockAudio, getMe, esc, normLinkedin, normGithub, signInHref } from '/common.js';
 import { costumePicker } from '/costume.js';
 
 const $ = (id) => document.getElementById(id);
@@ -95,7 +95,7 @@ refresh();
     if (!providers.length && !session) return;
     $('auth').hidden = false;
     const labels = { linkedin: 'LinkedIn', github: 'GitHub', google: 'Google', apple: 'Apple' };
-    const btn = (p, verb) => `<a class="btn secondary" href="/auth/${esc(p)}">${verb} ${esc(labels[p] || p)}</a>`;
+    const btn = (p, verb) => `<a class="btn secondary" href="${esc(signInHref(p))}">${verb} ${esc(labels[p] || p)}</a>`;
     if (!session) {
       $('auth-buttons').innerHTML = providers.map((p) => btn(p, 'Sign in with')).join('') + '<div class="hint" style="text-align:center">Fills in your name and photo. Optional.</div>';
     } else {

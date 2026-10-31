@@ -50,6 +50,13 @@ Design goals for a 4-hour build:
 | `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face (`web/costume.js`, from the face mesh, on-device) |
 | `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
+Two origins, one room. Fly serves the pages and the API together (https://aura-haunt.fly.dev). The Base44 mirror
+(https://aura-haunt.base44.app, built by `scripts/base44.mjs`) serves the same `web/` pages from Base44 hosting with
+`window.HAUNT_API` = the Fly URL, so its phones call the Fly API and socket and meet the Fly phones in one gallery.
+Pages reach the API only through `api()` / `connectWs()` / `API` in `web/common.js` (the build fails on a bare
+`fetch('/api…')`), import modules by absolute path (`/x.js`), and link pages without `.html` (`/register`; the
+mirror's `index.html` routes those to `/register.html`, because Base44 answers every non-file path with `index.html`).
+
 Framework: plain Vite + vanilla TS or React, whatever Shelled produces fastest.
 No SSR needed. Everything the camera does must run after a user gesture and over
 HTTPS (camera, mic, and motion sensors are all gated on both).
@@ -109,6 +116,8 @@ then do leave the phone, so the consent screen must say so if this path is taken
 
 - `express` (or Hono) for JSON + static files.
 - `ws` for one socket per phone, keyed by attendee id.
+- CORS on `/api` for the origins in `FRONTEND_ORIGINS` (fly.toml; `server/cors.js`): exact origins only, no
+  credentials. The cross-origin sign-in session travels in the `x-haunt-session` header, never a third-party cookie.
 - One JSON file (`data/db.json`), written on every change. Fifty attendees is nothing; SQLite if it ever matters.
   `data/version.json` holds the deploy counter (`server/version.js`, see `/api/version`).
 - OAuth: GitHub first (instant to set up), LinkedIn OIDC second (needs the
@@ -163,10 +172,10 @@ whenever their socket reconnects).
 
 | Method | Path | Body / returns |
 |---|---|---|
-| GET | `/auth/github`, `/auth/linkedin`, `/auth/google`, `/auth/apple` | OAuth redirect; sets session cookie. A second provider while signed in links to the same session |
-| GET, POST | `/auth/:provider/callback` | Provider return (Apple uses `form_post`, so POST). Redirects to `/register` |
+| GET | `/auth/github`, `/auth/linkedin`, `/auth/google`, `/auth/apple` | OAuth redirect; sets session cookie. A second provider while signed in links to the same session. `?return=<page>` (a page on a `FRONTEND_ORIGINS` origin, else 400) sends the callback back there instead of `/register` |
+| GET, POST | `/auth/:provider/callback` | Provider return (Apple uses `form_post`, so POST). Redirects to `/register`, or to the `return` page with `#haunt_session=<sid>.<sig>`; that page sends it back as the `x-haunt-session` header (`web/common.js`), which works wherever the cookie does |
 | POST | `/api/session/logout` | Clears the session cookie |
-| GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` |
+| GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` (cookie or `x-haunt-session` header) |
 | POST | `/api/attendee` | `{name, handle?, blurb?, linkedin?, consent: true, descriptors: [[...]], avatar?, costume?}` -> `{id, token}`. A signed-in session fills provider, name, handle, avatar. 400 unless `consent === true` and every descriptor has at least 128 finite numbers. `costume` is a short lowercase id (`web/costume.js`); anything else, or `'plain'`, stores `null` |
 | PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; a changed `handle` starts a GitHub lookup (the same handle keeps its profile). Every edit reaches every socket at once (#30): `attendee_changed` with the card, or `attendee_gone {id}` when the person is not findable (opted out or blocked; never their card). Turning consent back on broadcasts `gallery_changed` instead, because phones need the face descriptors again |
 | GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (the matching set `/hunt` loads; `costume` so it can draw it the moment a face matches). Cards and avatars come from `/api/attendee/:id` |
@@ -180,6 +189,9 @@ whenever their socket reconnects).
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
 | WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
 | WS | the Scout, same sockets | phone: `state {scout: {phase: 'clue', matchId, clue, deadline, round}}` when the Scout pairs you with someone (the clue describes the other person from profile and public GitHub, never a name, handle or photo), `state {scout: {phase: 'found', matchId, hauntId, reason}}` when a haunt between the pair lands. Screen: `scout {version, changedAt, weights, predicted {yes, no, n}, baseline {yes, no, n}, clues {sent, found, pending, expired}, changelog[], minN, ratedPairs, nextReviewAt}` on every clue, confirmation, rating and version change |
+
+Every `/api` route answers CORS for the `FRONTEND_ORIGINS` origins (preflight 204, methods GET POST PATCH DELETE,
+headers `content-type`, `x-haunt-session`, `x-admin-token`); `/ws` accepts any origin, as before.
 
 No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
 pushed like the first (no 429). `/hunt` still sends one haunt per card: the button

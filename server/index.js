@@ -12,6 +12,7 @@ import { ensureProfile, profileLoading } from './profile.js';
 import { mountAdmin } from './admin.js';
 import { deployInfo } from './version.js';
 import { mountScout } from './scout.js';
+import { cors } from './cors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -74,6 +75,7 @@ const cardChanged = (a) => { save(); pushCard(a); }; // a GitHub lookup landed o
 
 // ---------- app ----------
 const app = express();
+app.use('/api', cors); // the Base44 mirror of web/ calls the API cross-origin (server/cors.js, FRONTEND_ORIGINS)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
 if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
