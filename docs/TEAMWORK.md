@@ -88,3 +88,7 @@ Direct-to-main works when two people touch different files. Within the first hou
 The rule now: every session on its own branch `<name>/<task>`, pushed after every commit, landed through `/merge`. `main` only ever moves by fast-forward from a rebased branch, so it is always one person's tested state. The merge resolver (`.claude/skills/merge/SKILL.md`) does the rebase and reads both sides of every conflict instead of picking one; the semantic-conflict checklist there is the part humans skip under time pressure. The integrator lists branches away from main and nudges anyone past 45 minutes.
 
 Cost: one more step before your work is visible on main. Benefit: nobody's working tree is touched by anyone else, ever.
+
+## 9. The steering-agent model
+
+One Claude per person, all steered by the same three things: CLAUDE.md (rules), the bus (what everyone is doing right now), and ARCHITECTURE.md (the contract). Three skills mark the lifecycle of a piece of work: `/start` at the beginning (the SessionStart hook makes every fresh session open with it: state of the room, one question, claim, branch), `/integrator` in the middle (one tab watching main, branches and the bus, nudging), `/merge` at the end (rebase, resolve keeping both intents, fast-forward main). Nobody has to remember the process; their Claude runs it. The person's job is to pick what to build and to say when it works.

@@ -22,6 +22,7 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - End commit messages with the Co-Authored-By line when an agent wrote the change.
 
 ## Working in parallel
+- New session: run `/start` (greets with the state of the room, claims, branches). Never edit before claiming.
 - Claim a task in TODO.md (put your name in the Owner column) before starting; tick it when it is on main.
 - One owner per file at a time. Touching someone else's file: tell them first, keep the diff tiny.
 - Agents: one git worktree and one branch per task (`EnterWorktree` or `git worktree add`), landed with `/merge`, deleted when done.
