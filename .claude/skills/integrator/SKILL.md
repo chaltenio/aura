@@ -62,6 +62,18 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 
 5. **Run the smoke test** if `package.json` has a `test` script: `npm test --silent`. Otherwise `node --check server/index.js` and `curl -fsS localhost:3000/api/gallery` if a server is running. Record pass/fail.
 
+5b. **Pipeline and production watch** (the integrator owns "is it unblocked", not just "is it merged"):
+   ```bash
+   gh run list --limit 6 --json name,status,conclusion,headSha,url,createdAt --jq '.[] | "\(.name) \(.status) \(.conclusion) \(.headSha[0:7]) \(.url)"'
+   gh secret list 2>/dev/null | grep -q FLY_API_TOKEN || echo "NO FLY_API_TOKEN: deploys are skipped"
+   PROD=$(curl -fsS --max-time 8 https://aura-haunt.fly.dev/api/version 2>/dev/null) && echo "prod: $PROD" || echo "PROD DOWN or unreachable"
+   ```
+   Compare the `version` field (short sha) with `origin/main`: `git rev-list --count <prodsha>..origin/main` is how many commits production is behind. Act:
+   - CI failed on main: post `[ASK] @<author of headSha> CI red on <sha>: <job> (<url>); everyone pull but do not push until green`, and note it in STATUS.
+   - Deploy run failed or skipped while main moved: say why (missing `FLY_API_TOKEN`: the fix is `fly tokens create deploy -x 999999h -a aura-haunt | gh secret set FLY_API_TOKEN --repo chaltenio/aura`; a build error: quote the first error line and ping the author).
+   - Production unreachable for two passes: post `[ASK] @matt prod down since HH:MM` and tell the room to use `npm run tunnel` on a laptop for the demo. Do not redeploy or roll back yourself unless a standing order says so; `scripts/deploy.sh rollback` is the command for whoever does.
+   - Production more than 3 commits behind main with no deploy run in progress: say so and name the last deploy run's conclusion.
+
 6. **Read every new commit's diff** (`git show --stat <sha>`, then `git show <sha> -- <file>` for anything under `server/` or `web/`). Check, in this order:
    - **Contract drift:** a route, payload field, or WebSocket event name that differs from ARCHITECTURE.md. Either the doc or the code is wrong; name which.
    - **Ownership collisions:** two different authors touched the same file since the last pass, or a commit touched a file whose TODO.md owner is someone else. Direct commits to `main` that did not come through `/merge` (author is not the merge resolver, no `merged <branch>` bus post): name them; main is `/merge`-only.
@@ -99,4 +111,4 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 - Standing orders can be added below this line by the team and are honoured on every pass.
 
 ## Standing orders
-- (none yet)
+- Production is https://aura-haunt.fly.dev (Fly app `aura-haunt`, region sjc); `scripts/deploy.sh status|logs|rollback`. Deploys run from `.github/workflows/deploy.yml` on every push to main.
