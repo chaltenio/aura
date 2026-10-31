@@ -35,3 +35,9 @@ scans/
 logs/
 tmp/
 .DS_Store
+
+# runtime data
+data/
+
+# integrator state
+.integrator-last
