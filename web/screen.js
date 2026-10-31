@@ -1,4 +1,5 @@
 import { api, connectWs, esc, fmtTime } from '/common.js';
+import { renderScout } from '/scout.js';
 const $ = (id) => document.getElementById(id);
 const joinUrl = location.origin + '/register';
 const q = qrcode(0, 'M'); q.addData(joinUrl); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2 });
@@ -16,10 +17,11 @@ function render() {
   $('top-haunted').innerHTML = board(top('target'));
   $('top-hunters').innerHTML = board(top('actor'));
 }
-async function load() { const d = await api('/api/events?limit=200'); events = d.events; attendees = d.attendees; render(); }
+async function load() { const d = await api('/api/events?limit=200'); events = d.events; attendees = d.attendees; render(); renderScout(d.scout); }
 await load();
 // attendee_gone: someone turned findable off, so the headcount drops now (attendee_changed alters nothing shown here)
 connectWs({ screen: '1' }, (msg) => {
   if (msg.type === 'event') { events.unshift(msg.event); freshId = msg.event.id; render(); }
+  if (msg.type === 'scout') renderScout(msg.scout);
   if (msg.type === 'joined' || msg.type === 'gallery_changed' || msg.type === 'attendee_gone') load();
 });

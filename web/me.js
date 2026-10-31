@@ -1,5 +1,6 @@
 import { api, getMe, clearMe, connectWs, soundOn, hauntedAlert, toast, esc, fmtTime, renderProfile, normGithub, normLinkedin } from '/common.js';
 import { costumePicker } from '/costume.js';
+import { scoutState, scoutRate } from '/scout.js'; // the Scout: clues on `state`, one rating question after a haunt
 const $ = (id) => document.getElementById(id);
 const me = getMe();
 
@@ -65,7 +66,8 @@ if (!me) { $('nocard').hidden = false; } else {
   };
   render();
   connectWs({ attendee: me.id }, (msg) => {
-    if (msg.type === 'haunted') { hauntedAlert(msg); render(); }
+    if (msg.type === 'haunted') { hauntedAlert(msg); scoutRate(msg.hauntId); render(); }
+    if (msg.type === 'state' && msg.scout) scoutState(msg.scout);
     // profile edits arrive the moment they are saved: your own card (the GitHub lookup landing) and the people you met tonight
     if (msg.type === 'attendee_changed') {
       const k = msg.attendee, c = conns.find((x) => x.card.id === k.id);
