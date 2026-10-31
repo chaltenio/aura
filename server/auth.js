@@ -1,6 +1,17 @@
-// OAuth sign-in (GitHub, LinkedIn OpenID Connect). Pure Node, no deps. Enabled per provider when its env vars exist.
-// Flow: GET /auth/:provider -> provider -> GET /auth/:provider/callback -> profile cached server-side -> cookie -> /register
-import { randomBytes, createHmac } from 'node:crypto';
+// OAuth sign-in (GitHub, LinkedIn OIDC, Google OIDC, Sign in with Apple). Pure Node, no deps. Enabled per provider when its env vars exist.
+// Flow: GET /auth/:provider -> provider -> GET|POST /auth/:provider/callback -> profile cached server-side -> cookie -> /register
+// Signing in with a second provider while a session exists links it to the same profile (see `linked`).
+import { randomBytes, createHmac, createPrivateKey, sign as signRaw } from 'node:crypto';
+
+const b64u = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
+// Apple wants a client secret that is a short-lived ES256 JWT signed with the team's .p8 key (env holds it with literal \n).
+function appleClientSecret() {
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64u({ alg: 'ES256', kid: process.env.APPLE_KEY_ID });
+  const body = b64u({ iss: process.env.APPLE_TEAM_ID, iat: now, exp: now + 300, aud: 'https://appleid.apple.com', sub: process.env.APPLE_CLIENT_ID });
+  const key = createPrivateKey(process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'));
+  return `${head}.${body}.${signRaw('sha256', Buffer.from(`${head}.${body}`), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
+}
 
 const PROVIDERS = {
   github: {
@@ -23,13 +34,38 @@ const PROVIDERS = {
       return { provider: 'linkedin', providerId: String(u.sub), name: u.name || `${u.given_name || ''} ${u.family_name || ''}`.trim(), handle: '', avatarUrl: u.picture || null, linkedin: '' };
     },
   },
+  google: {
+    enabled: () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    authorize: (redirect, state) => `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ response_type: 'code', client_id: process.env.GOOGLE_CLIENT_ID, redirect_uri: redirect, state, scope: 'openid profile email' })}`,
+    async profile(code, redirect) {
+      const tok = await (await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirect, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET }) })).json();
+      if (!tok.access_token) throw new Error('google token: ' + JSON.stringify(tok));
+      const u = await (await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: `Bearer ${tok.access_token}` } })).json();
+      return { provider: 'google', providerId: String(u.sub), name: u.name || `${u.given_name || ''} ${u.family_name || ''}`.trim(), handle: '', avatarUrl: u.picture ? u.picture.replace(/=s\d+(-c)?$/, '=s256-c') : null, linkedin: '' };
+    },
+  },
+  apple: {
+    enabled: () => !!(process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY),
+    // Apple POSTs the callback (form_post) and sends the user's name only on the very first authorization; no avatar at all.
+    authorize: (redirect, state) => `https://appleid.apple.com/auth/authorize?${new URLSearchParams({ response_type: 'code', response_mode: 'form_post', client_id: process.env.APPLE_CLIENT_ID, redirect_uri: redirect, state, scope: 'name' })}`,
+    async profile(code, redirect, extra = {}) {
+      const tok = await (await fetch('https://appleid.apple.com/auth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirect, client_id: process.env.APPLE_CLIENT_ID, client_secret: appleClientSecret() }) })).json();
+      if (!tok.id_token) throw new Error('apple token: ' + JSON.stringify(tok));
+      const claims = JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString()); // straight from Apple over TLS, so no signature check needed (OIDC core 3.1.3.7)
+      let n = {}; try { n = JSON.parse(extra.user || '{}').name || {}; } catch {}
+      return { provider: 'apple', providerId: String(claims.sub), name: `${n.firstName || ''} ${n.lastName || ''}`.trim(), handle: '', avatarUrl: null, linkedin: '' };
+    },
+  },
 };
 
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
 const sign = (v) => createHmac('sha256', SECRET).update(v).digest('base64url');
 const sessions = new Map(); // sid -> profile (in memory; lost on restart, which is fine: it only pre-fills /register)
 const cookies = (req) => Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((p) => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
-const setCookie = (res, name, value, maxAge) => res.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${process.env.PUBLIC_BASE_URL?.startsWith('https') ? '; Secure' : ''}`);
+const isHttps = () => !!process.env.PUBLIC_BASE_URL?.startsWith('https');
+// SameSite=None (needs Secure) only for the state cookie: Apple's form_post callback is a cross-site POST, which Lax cookies never ride on.
+const setCookie = (res, name, value, maxAge, sameSite = 'Lax') => res.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=${sameSite === 'None' && !isHttps() ? 'Lax' : sameSite}; Max-Age=${maxAge}${isHttps() ? '; Secure' : ''}`);
+const readForm = (req) => new Promise((resolve) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 20_000) req.destroy(); }); req.on('end', () => resolve(Object.fromEntries(new URLSearchParams(b)))); req.on('error', () => resolve({})); });
 const baseUrl = (req) => (process.env.PUBLIC_BASE_URL || `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/$/, '');
 
 /** Profile for this request's session cookie, or null. */
@@ -51,29 +87,39 @@ async function fetchAvatar(url) {
 
 export function mountAuth(app) {
   app.get('/api/auth/providers', (_req, res) => res.json(Object.entries(PROVIDERS).filter(([, p]) => p.enabled()).map(([k]) => k)));
-  app.get('/api/session', (req, res) => { const p = sessionProfile(req); res.json(p ? { provider: p.provider, name: p.name, handle: p.handle, avatar: p.avatar, linkedin: p.linkedin } : null); });
+  app.get('/api/session', (req, res) => { const p = sessionProfile(req); res.json(p ? { provider: p.provider, linked: Object.keys(p.linked || {}), name: p.name, handle: p.handle, avatar: p.avatar, linkedin: p.linkedin } : null); });
   app.post('/api/session/logout', (req, res) => { const c = cookies(req); if (c.haunt_sid) sessions.delete(c.haunt_sid); setCookie(res, 'haunt_sid', '', 0); setCookie(res, 'haunt_sig', '', 0); res.json({ ok: true }); });
 
   app.get('/auth/:provider', (req, res) => {
     const p = PROVIDERS[req.params.provider];
     if (!p || !p.enabled()) return res.status(404).send('provider not configured');
     const state = randomBytes(16).toString('hex');
-    setCookie(res, 'oauth_state', `${req.params.provider}:${state}:${sign(state)}`, 600);
+    setCookie(res, 'oauth_state', `${req.params.provider}:${state}:${sign(state)}`, 600, 'None');
     res.redirect(p.authorize(`${baseUrl(req)}/auth/${req.params.provider}/callback`, state));
   });
 
-  app.get('/auth/:provider/callback', async (req, res) => {
+  const callback = async (req, res) => {
     const p = PROVIDERS[req.params.provider];
+    const q = req.method === 'POST' ? await readForm(req) : req.query;
     const [prov, state, sig] = (cookies(req).oauth_state || '').split(':');
     try {
       if (!p || !p.enabled()) throw new Error('provider not configured');
-      if (prov !== req.params.provider || !state || sig !== sign(state) || req.query.state !== state) throw new Error('bad state');
-      if (!req.query.code) throw new Error(String(req.query.error_description || req.query.error || 'no code'));
-      const profile = await p.profile(String(req.query.code), `${baseUrl(req)}/auth/${req.params.provider}/callback`);
+      if (prov !== req.params.provider || !state || sig !== sign(state) || q.state !== state) throw new Error('bad state');
+      if (!q.code) throw new Error(String(q.error_description || q.error || 'no code'));
+      const profile = await p.profile(String(q.code), `${baseUrl(req)}/auth/${req.params.provider}/callback`, q);
       profile.avatar = await fetchAvatar(profile.avatarUrl); delete profile.avatarUrl; // LinkedIn picture URLs expire: keep bytes, not the URL
-      const sid = randomBytes(16).toString('hex'); sessions.set(sid, profile);
-      setCookie(res, 'haunt_sid', sid, 86400); setCookie(res, 'haunt_sig', sign(sid), 86400); setCookie(res, 'oauth_state', '', 0);
-      res.redirect('/register');
+      const c = cookies(req); const existing = sessionProfile(req);
+      let sid = c.haunt_sid;
+      if (existing) { // second provider: keep the first as primary, fill whatever it lacked
+        for (const k of ['name', 'handle', 'avatar', 'linkedin']) existing[k] = existing[k] || profile[k];
+        existing.linked[profile.provider] = profile.providerId;
+      } else {
+        sid = randomBytes(16).toString('hex'); profile.linked = { [profile.provider]: profile.providerId }; sessions.set(sid, profile);
+      }
+      setCookie(res, 'haunt_sid', sid, 86400); setCookie(res, 'haunt_sig', sign(sid), 86400); setCookie(res, 'oauth_state', '', 0, 'None');
+      res.redirect(303, '/register');
     } catch (e) { res.status(400).send(`<p>Sign-in failed: ${String(e.message).replace(/[<>&]/g, '')}</p><p><a href="/register">Back</a></p>`); }
-  });
+  };
+  app.get('/auth/:provider/callback', callback);
+  app.post('/auth/:provider/callback', callback);
 }
