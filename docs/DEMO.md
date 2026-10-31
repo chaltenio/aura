@@ -12,7 +12,7 @@
 | 0:00 | "Point your phone at someone in this room and know who they are. Opt-in only. Faces never leave the phone." | Show `/screen` QR. |
 | 0:15 | "Registration is 60 seconds: name, GitHub, consent, three selfies. Only a 512-number signature is uploaded." | Scan QR on a judge's phone, register them live. |
 | 0:50 | "Now I hunt." | `/hunt`, point at the judge, card appears with name, handle, bio, pushes this week, recent repos. |
-| 1:10 | "And I haunt them." | Tap Haunt. Their phone shrieks and flashes "You've been haunted by ...". Screen feed updates. |
+| 1:10 | "And I haunt them. Now they can haunt me back." | Tap Haunt. Their phone shrieks and flashes "You've been haunted by ...". The judge taps **Haunt back** on that alert; the presenter's phone shrieks "... haunted you back!". Screen feed updates. |
 | 1:30 | "Every match is computed on the phone: a detector, landmarks, an aligned ArcFace crop, a 7 MB open-source embedder. The server only ever sees signatures and events." | Show `/calibrate` matrix if asked how good it is. |
 | 1:50 | "Kill switch: one tap and you vanish from every phone." | Toggle Findable off on `/me`; the hunter's phone stops naming them. |
 
