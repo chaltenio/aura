@@ -1,5 +1,6 @@
 :root { --bg:#0b0a10; --panel:#16141f; --panel2:#1f1c2b; --line:#2a2738; --ink:#ece7f5; --mute:#9a93ad; --accent:#ff6a00; --ok:#7CFF6B; --bad:#ff4d6d; --glow:#b14cff; color-scheme: dark; }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* .btn, .card img and friends set display, which would beat the hidden attribute */
 html, body { margin:0; background:var(--bg); color:var(--ink); font: 16px/1.4 -apple-system, system-ui, Segoe UI, Roboto, sans-serif; -webkit-text-size-adjust:100%; -webkit-tap-highlight-color: transparent; }
 body { padding: 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(24px, env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
 h1 { font-size: 28px; margin: 8px 0 4px; letter-spacing: .5px; }
@@ -198,3 +199,13 @@ details.dev { margin-top: 18px; }
 .conn-meta .dir { color: var(--ink); }
 .conn-meta .dir.both { color: var(--ok); }
 .conn-meta .dir.in { color: var(--glow); }
+/* /me: the two counters under your card, and the sound status button */
+.stats { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.stats > div { background: var(--panel2); border-radius: 12px; padding: 10px 12px; color: var(--mute); font-size: 13px; }
+.stats b { display:block; color: var(--ink); font-size: 24px; line-height: 1.15; }
+#arm:not(.sound-on) { box-shadow: inset 0 0 0 2px #ff6a0088; }
+#arm.sound-on { color: var(--ok); }
+/* /screen header + feed rows */
+.screen h1 .tagline { display:block; font-size: 15px; font-weight: 500; letter-spacing: 0; line-height: 1.3; margin-top: 2px; }
+.screen .ev time { margin-left: auto; }
+@media (min-width: 900px) { body.screen h1 .tagline { display:inline; font-size: 24px; margin-left: 10px; } }
