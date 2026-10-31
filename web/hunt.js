@@ -9,6 +9,12 @@ const firstName = (n) => String(n || '').trim().split(/\s+/)[0];
 const VOTES_NEEDED = 3;
 const GONE_MS = 2500;      // a closed card re-arms once that person has been out of frame this long
 const AUTO_CLOSE_MS = 15000; // an untouched card closes after its person has been out of frame this long
+// Apple Vision Pro: its Safari passes for a Mac but has touch points and WebXR (and <model>), and it lends web pages only
+// the Persona camera (your own avatar), never the cameras that see the room. There /hunt runs on photos instead (snap
+// mode): a screenshot of what you see, picked from Photos. ?snap=1 forces snap mode anywhere, ?snap=0 the live camera.
+const snapParam = new URLSearchParams(location.search).get('snap');
+const visionPro = /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1 && ('HTMLModelElement' in window || 'xr' in navigator);
+let snapMode = snapParam ? snapParam === '1' : visionPro;
 let engine = null, index = buildIndex([]), stream = null, running = false, wantRunning = false;
 const votes = new Map();   // attendeeId -> consecutive frames
 const snoozed = new Map(); // attendeeId -> last seen while their card is closed (Close, or after a haunt)
@@ -16,6 +22,7 @@ let shown = null, shownSim = 0, lastSeenShown = 0, sheetTouched = false, closeTi
 const me = getMe();
 const costumes = costumeLayer($('wrap'), { threshold: THRESHOLD }); // draws a recognised person's costume over the camera
 if (!me) { $('melink').textContent = 'Register'; $('melink').href = '/register'; }
+if (snapMode) enterSnap();
 
 const others = () => new Set(index.owners.filter((o) => o.id !== me?.id).map((o) => o.id)).size;
 function renderCounts() {
@@ -47,7 +54,7 @@ connectWs(me ? { attendee: me.id } : {}, (msg) => {
 });
 
 loadEngine({ video: true, onProgress: (t) => { status(t); $('idle-sub').textContent = 'Loading face model… (first time only)'; } })
-  .then((h) => { engine = h; status(`Ready (${ENGINE}). ${others()} findable people. Tap Start.`); renderCounts(); $('start').disabled = false; autoStart(); })
+  .then((h) => { engine = h; status(`Ready (${ENGINE}). ${others()} findable people. Tap Start.`); renderCounts(); $('start').disabled = false; if (!snapMode) autoStart(); })
   .catch((e) => {
     status('Model failed: ' + e.message);
     $('idle-sub').textContent = "The face model didn't load. Check your connection and reload.";
@@ -80,12 +87,14 @@ function showCard(att, sim) {
 function closeCard(snooze = true) {
   if (shown && snooze) snoozed.set(shown.id, Date.now());
   $('sheet').classList.remove('show'); shown = null; shownId = null; votes.clear(); clearTimeout(closeTimer);
+  if (snapMode && $('idle').hidden) hint(snapNamed().length ? 'Tap a name for their card, elsewhere for a new photo' : '📸 Tap for another photo');
 }
 $('dismiss').onclick = () => closeCard(true);
 $('grab').onclick = () => closeCard(true);
 $('sheet').addEventListener('pointerdown', () => { sheetTouched = true; });
 // tap the camera to reopen a card you closed while that person is still in view
-$('wrap').addEventListener('click', () => {
+$('wrap').addEventListener('click', (ev) => {
+  if (snapMode) return snapTap(ev);
   if (!running || shown) return;
   const id = [...votes.keys()].find((k) => snoozed.has(k));
   if (id) { snoozed.delete(id); votes.set(id, VOTES_NEEDED); }
@@ -207,6 +216,7 @@ async function start() {
   starting = true; wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
   try {
     stream = await navigator.mediaDevices.getUserMedia(await pickRearCamera());
+    if (/persona/i.test(stream.getVideoTracks()[0]?.label || '')) { stream.getTracks().forEach((t) => t.stop()); stream = null; wantRunning = false; enterSnap(); return; } // a headset's avatar camera: it can only ever see you
     $('video').srcObject = stream; await $('video').play().catch(() => {});
     $('idle').hidden = true; running = true; wakeLock();
     $('hud-state').innerHTML = '<span class="dot"></span>Scanning'; hint('Point at a face');
@@ -218,7 +228,7 @@ async function start() {
 }
 // camera already allowed on this phone (a return visit): start without the extra tap
 async function autoStart() { try { if ((await navigator.permissions?.query({ name: 'camera' }))?.state === 'granted') start(); } catch {} }
-$('start').onclick = () => { unlockAudio(); start(); };
+$('start').onclick = () => { unlockAudio(); if (snapMode) $('snapfile').click(); else start(); };
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (running) { running = false; stream?.getTracks().forEach((t) => t.stop()); stream = null; $('hud-state').textContent = ''; hint(''); }
@@ -233,4 +243,42 @@ $('testfile').onchange = async (e) => {
   status(r.length ? r.map((x) => `${x.attendee ? x.attendee.name : 'nobody'} ${(x.similarity * 100).toFixed(0)}%`).join(' | ') : 'no faces in photo');
   window.__lastTest = r.map((x) => ({ name: x.attendee?.name || null, id: x.attendee?.id || null, similarity: x.similarity, box: x.box }));
 };
-window.__haunt = { get index() { return index; }, get shown() { return shown; }, THRESHOLD };
+
+// ---------- snap mode (Apple Vision Pro): a photo of the room instead of the live camera ----------
+// One photo stands in for the 3-frame vote. Every face is labelled on the photo; the best match opens its card, and tapping
+// another named face opens theirs. Tapping anywhere else picks a new photo. The photo never leaves the device.
+let snapResults = [], snapping = false;
+const snapNamed = () => snapResults.filter((r) => r.attendee && r.similarity >= THRESHOLD);
+/** Size the camera box to the photo (no 3:4 crop, so taps map straight onto faces), at most 75% of the window tall. */
+function fitWrap(w, h, minHeight = '') {
+  const s = $('wrap').style; s.aspectRatio = `${w} / ${h}`; s.maxWidth = `${Math.round(innerHeight * 0.75 * w / h)}px`; s.marginInline = 'auto'; s.minHeight = minHeight;
+}
+function enterSnap() {
+  snapMode = true; $('idle').hidden = false; fitWrap(16, 9, '300px'); // a headset screenshot is 16:9, so the first photo lands without a jump
+  $('idle-text').textContent = "Safari on Vision Pro can't see the room, so snap it: look at someone, press the top button and the Digital Crown together, then pick that screenshot here.";
+  $('start').textContent = '📸 Pick a photo'; $('start').disabled = !engine; renderCounts();
+}
+async function snap(file) {
+  if (!file || !engine || snapping) return;
+  snapping = true; closeCard(false); snoozed.clear(); $('idle').hidden = true; hint('Looking…');
+  try {
+    const img = await imageFromFile(file);
+    fitWrap(img.naturalWidth || img.width, img.naturalHeight || img.height);
+    let r = [];
+    for (let i = 0; i < VOTES_NEEDED; i++) r = await processFrame(img);
+    snapResults = r; $('hud-state').textContent = '📸 Photo';
+    status(r.length ? r.map((x) => `${x.attendee && x.similarity >= THRESHOLD ? x.attendee.name : 'unknown'} ${(x.similarity * 100).toFixed(0)}%`).join(' | ') : 'no faces in photo');
+    if (!shown) hint(!r.length ? 'No face found. Tap for another photo' : r.some((x) => x.attendee && x.similarity >= ABSTAIN) ? 'Not sure who that is. Tap for another photo' : 'Nobody findable here. Tap for another photo');
+  } catch (e) { hint("Couldn't read that photo. Tap for another"); status('photo error: ' + e.message); }
+  finally { snapping = false; }
+}
+/** A tap on the photo: a named face opens that person's card, anywhere else picks a new photo. */
+function snapTap(ev) {
+  if (shown || snapping || !$('idle').hidden) return; // the idle panel's own button handles the first pick
+  const c = $('overlay'), b = c.getBoundingClientRect();
+  const x = (ev.clientX - b.left) * c.width / b.width, y = (ev.clientY - b.top) * c.height / b.height;
+  const hit = snapNamed().find(({ box: [bx, by, bw, bh] }) => x >= bx && x <= bx + bw && y >= by && y <= by + bh);
+  if (hit) { snoozed.delete(hit.attendee.id); showCard(hit.attendee, hit.similarity); } else $('snapfile').click();
+}
+$('snapfile').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; snap(f); };
+window.__haunt = { get index() { return index; }, get shown() { return shown; }, get snapMode() { return snapMode; }, THRESHOLD };

@@ -221,7 +221,8 @@ taps the camera. An open card stays on its person until they leave the frame.
 
 **Hunt**
 
-1. `/hunt` opens the rear camera at 640x480 (enough for faces at 2 to 3 m).
+1. `/hunt` opens the rear camera at 640x480 (enough for faces at 2 to 3 m). On
+   Apple Vision Pro it runs in snap mode instead (section 6).
 2. Fetch gallery once; refetch it on `gallery_changed` and on a reconnect. On
    `attendee_changed` patch that person in place (a new costume is drawn on the
    next frame, an open card re-renders); on `attendee_gone` drop their face.
@@ -257,6 +258,7 @@ phone drops that face at once (an open card closes) and `/screen` recounts.
 |---|---|
 | Dim party lighting, no match | Live selfie taken in the same room; lower threshold only after testing; QR on badge as fallback identity |
 | iOS kills camera when tab backgrounds | Re-acquire stream on `visibilitychange`; show a "tap to resume" overlay. Only one active getUserMedia at a time; `<video autoplay muted playsinline>` is mandatory; `facingMode: 'environment'` may pick the ultra-wide lens, so prefer the device labelled "Back Camera" |
+| Apple Vision Pro: Safari lends web pages only the Persona camera (your own avatar, or a crossed-out placeholder), never the cameras that see the room | `/hunt` spots visionOS Safari (a Mac user agent with touch points and WebXR or `<model>`) and never opens the camera: snap mode. Look at someone, take a screenshot (top button + Digital Crown), pick it; one photo stands in for the 3-frame vote, every face is labelled, the best match opens its card, a tap on another name opens theirs. The photo never leaves the headset. `?snap=1` forces snap mode anywhere, `?snap=0` the live camera. The room cameras need a native app with Apple's Enterprise main-camera license |
 | Audio does not play on the haunted phone | Unlock Web Audio with a silent buffer on the register tap; keep the page open (no Web Push in the core) |
 | Phone too slow for the model | Lower video resolution; detect every Nth frame; `?engine=human` skips the second model; last resort is the DeepFace server-side path |
 | Two attendees look alike / twins | Show top-2 when the margin between them is < 0.05 and let the hunter pick |
