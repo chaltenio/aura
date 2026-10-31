@@ -71,3 +71,4 @@ button:disabled { opacity:.45; }
 .conn-meta .dir { color: var(--ink); }
 .conn-meta .dir.both { color: var(--ok); }
 .conn-meta .dir.in { color: var(--glow); }
+.card [hidden] { display: none; } /* .card img/.noavatar set display:grid, which beat the hidden attribute (two avatar circles on /me and /hunt) */
