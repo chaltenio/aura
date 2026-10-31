@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const DATA_DIR = join(ROOT, 'data');
+const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
 const DB_PATH = join(DATA_DIR, 'db.json');
 const PORT = Number(process.env.PORT || 3000);
 const HAUNT_COOLDOWN_MS = 60_000;
@@ -57,6 +57,7 @@ const publicCard = (a) => ({
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
+if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
 
 // register (manual provider; OAuth comes later)
 app.post('/api/attendee', (req, res) => {
