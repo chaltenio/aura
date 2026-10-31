@@ -15,8 +15,8 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 3 | Real-phone test over the tunnel: register with selfies, hunt a teammate, hear the shriek | (needs a human) | [ ] |
 | 4 | Deploy to a public HTTPS URL (Fly/Railway/Render), weights fetched on boot, `data/` persisted | main session | [ ] |
 | 5 | Register everyone on the team: Luma + sign the pact + activate the Duck on ASI:One | each person | [ ] |
-| 6 | First Shelled run on this repo (PR 3 scope: `/screen` + leaderboard polish). Paste run link in PR body | | [ ] |
-| 7 | EDGE_CASES.md: first two entries from the Shelled run | | [ ] |
+| 6 | First Shelled run on this repo (Run 1 in docs/SHELLED_RUNS.md: narrator on `/screen`). Paste run link in PR body | tarecq | [ ] |
+| 7 | EDGE_CASES.md: first two entries from the Shelled run | tarecq | [ ] |
 
 ## Next
 
