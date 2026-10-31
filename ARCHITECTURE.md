@@ -174,10 +174,11 @@ whenever their socket reconnects).
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
+| GET | `/api/presence` | `{online, findable, people}`: `online` = ids of findable people with a phone page open right now (a haunt makes that phone shriek), `findable` = how many are registered and findable, `people` = every findable person `{id, name, handle, avatar, costume, online}`, online first, then by name. No tokens, no descriptors. Live updates come as the `presence` push |
 | GET | `/api/version` | `{version, deploy, deployedAt, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`); `deploy` = the deploy number, one more on every deploy (a new Fly image, `FLY_IMAGE_REF`; off Fly a new `APP_VERSION`), kept with `deployedAt` (ms, when that deploy first booted) in `data/version.json`, both `null` on a dev build; boot time; counts. The home page footer shows `v<deploy> · <version> · deployed <time>`. Used by deploy and integrator checks |
 | GET | `/admin` | Admin page; asks for the token, calls the routes below |
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
-| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
+| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `presence {online, findable}` (on every connect, then whenever who is online or the findable count changes; see Presence below), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
 
 No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
 pushed like the first (no 429). `/hunt` still sends one haunt per card: the button
@@ -185,6 +186,16 @@ re-arms only after the card closes and that person is found again. A closed card
 (Close, or 3.5 s after a sent haunt) stays closed while that person is still in
 frame; it re-arms once they have been out of frame for 2.5 s, or when the hunter
 taps the camera. An open card stays on its person until they leave the frame.
+
+Presence (#33, `server/presence.js`): someone is **online** while a page that plays the
+shriek (`/hunt` or `/me`) holds `/ws?attendee=<id>` open on their phone, so a haunt reaches
+them live. Everyone findable is still recognised by `/hunt` when offline, and a haunt on them
+is saved to their card, without the shriek. Only findable people (opted in, not blocked) are
+counted or listed; "registered" in the UI means this findable count. The server pings every
+socket every 15 s (`PRESENCE_HEARTBEAT_MS`) and drops one that missed its pong, which is how a
+locked phone or a lost network goes offline; a 4 s grace after a page's last socket closes
+(`PRESENCE_GRACE_MS`) keeps a reload, or the hop from `/hunt` to `/me`, from flickering. A
+`presence` push goes out at most every 250 ms, and only when the online set or the count changed.
 
 ## 4. Flows
 

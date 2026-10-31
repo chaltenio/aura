@@ -11,6 +11,7 @@ import { mountAuth, sessionProfile } from './auth.js';
 import { ensureProfile, profileLoading } from './profile.js';
 import { mountAdmin } from './admin.js';
 import { deployInfo } from './version.js';
+import { mountPresence } from './presence.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -46,10 +47,11 @@ console.log(VERSION.deploy ? `deploy v${VERSION.deploy} (${VERSION.version})` : 
 const db = existsSync(DB_PATH)
   ? JSON.parse(readFileSync(DB_PATH, 'utf8'))
   : { attendees: [], events: [] };
-let saveTimer = null;
+let saveTimer = null, presence = null; // presence (#33) is set once the socket server exists
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => writeFileSync(DB_PATH, JSON.stringify(db)), 50);
+  presence?.update(); // a join, an opt-out or an admin block changes who is findable
 }
 const byId = (id) => db.attendees.find((a) => a.id === id);
 // costume: optional look picked at /register or /me (the list lives in web/costume.js); the server only keeps a short id. 'plain' or junk = none.
@@ -207,5 +209,6 @@ wss.on('connection', (ws, req) => {
 function sendTo(id, msg) { for (const ws of sockets.get(id) || []) if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(msg) { const s = JSON.stringify(msg); for (const ws of wss.clients) if (ws.readyState === 1) ws.send(s); }
 function broadcastScreen(msg) { const s = JSON.stringify(msg); for (const ws of screens) if (ws.readyState === 1) ws.send(s); }
+presence = mountPresence(app, { db, wss, sockets, broadcast }); // who is online (#33): heartbeat, `presence` push, GET /api/presence
 
 ensureWeights().finally(() => server.listen(PORT, () => console.log(`HAUNT listening on http://localhost:${PORT}`)));
