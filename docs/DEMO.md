@@ -11,7 +11,7 @@
 |---|---|---|
 | 0:00 | "Point your phone at someone in this room and know who they are. Opt-in only. Faces never leave the phone." | Show `/screen` QR. |
 | 0:15 | "Registration is 60 seconds: name, GitHub, consent, three selfies, and a costume if you want one. Only a 512-number signature is uploaded." | Scan QR on a judge's phone, register them live; they tap a costume (Vampire reads best on stage). |
-| 0:50 | "Now I hunt." | `/hunt`, point at the judge: their costume lands on their face (red eyes, fangs, bats), its sting plays, and the card says "🧛 Count <name>" with name, handle, bio, pushes this week, recent repos. |
+| 0:50 | "Now I hunt." | `/hunt`, point at the judge: a Snapchat-style lens lands on their face (vampire: pale skin, glowing red irises that blink with them, fangs when they open their mouth, 3D bats circling their head), its sting plays, and the card says "🧛 Count <name>" with name, handle, bio, pushes this week, recent repos. |
 | 1:10 | "And I haunt them. Now they can haunt me back." | Tap Haunt. Their phone shrieks and flashes "You've been haunted by ...". The judge taps **Haunt back** on that alert; the presenter's phone shrieks "... haunted you back!". Screen feed updates. |
 | 1:30 | "Every match is computed on the phone: a detector, landmarks, an aligned ArcFace crop, a 7 MB open-source embedder. The server only ever sees signatures and events." | Show `/calibrate` matrix if asked how good it is. |
 | 1:50 | "Kill switch: one tap and you vanish from every phone." | Toggle Findable off on `/me`; the hunter's phone stops naming them. |
@@ -22,7 +22,7 @@
 - Built today from an empty folder; see docs/INTEGRATION_LOG.md and the commit history.
 
 ## Likely questions
-- **Is the costume a cloud face filter?** No. The hunter's phone draws it from the same face landmarks the matcher already computes; the server stores only the costume's name (`vampire`), and only people who opted in can wear one.
+- **Is the costume a cloud face filter?** No. It runs on the hunter's phone: once recognition has named someone, Google's open-source MediaPipe tracks that one face at camera rate and WebGL paints it. The tracker never identifies anyone; the server stores only the costume's name (`vampire`), and only people who opted in can wear one.
 - **Privacy / consent?** Opt-in toggle at registration, gallery only serves consenting people, kill switch is immediate, server data is deleted after the event, no face ever goes to a hosted model (Anthropic policy and our rule).
 - **Why not an app?** One URL, works in iOS Safari and Android Chrome, nobody installs anything at a conference.
 - **Lookalikes / twins?** Abstain band and 3-frame vote; a wrong name on a stranger is the failure we tuned against.

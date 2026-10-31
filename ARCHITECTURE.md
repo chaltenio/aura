@@ -47,7 +47,7 @@ Design goals for a 4-hour build:
 | Route | Job |
 |---|---|
 | `/register` | OAuth login (its profile photo is the face signature, embedded on-device), consent toggle, selfie capture (optional when the photo has a face), optional costume, upload |
-| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face (`web/costume.js`, from the face mesh, on-device) |
+| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face: the WebGL lens (`web/lens.js`, see 1.2) when it loads, else flat 2D costumes (`web/costume.js`, from the recognition mesh) |
 | `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
 Framework: plain Vite + vanilla TS or React, whatever Shelled produces fastest.
@@ -66,6 +66,21 @@ transform (`alignToArcFace`), and feed it to FaceX's EdgeFace-XS wasm embedder
 (Apache-2.0, 7 MB, vendored in `web/vendor/facex/`), which returns a 512-float
 vector. Matching is cosine similarity. FaceX's own detector is not used: its weight
 file is unpublished, and its bundled align.js produced shifted crops.
+
+**Costume lens (effects only, `web/lens.js`).** Once recognition has confirmed a
+face (the card's 3-frame vote) and that person picked a costume, MediaPipe Face
+Landmarker (`@mediapipe/tasks-vision` 1.2.0, Apache-2.0, GPU delegate, CPU fallback)
+tracks it at camera rate inside a square crop around it (its own detector only
+finds selfie-distance faces). three.js (0.184) then draws the costume over the camera:
+face paint in UV space (`web/vendor/facegeom.js`, MediaPipe's canonical face model)
+wrapped onto the 478 landmarks and shaded by the real skin, irises recoloured inside
+the eyelids (stencil), a mouth that goes black or glows, fangs inside the open mouth,
+and 3D props posed by MediaPipe's head-pose matrix (63 degree camera, rendered
+through a viewport matching the crop) and hidden behind a head occluder. The lens
+never names anyone: it only draws on ids recognition handed it, and a tracked face
+that drifts from recognition's box is reset. Nothing leaves the phone; the libraries
+and the 3.7 MB model come from jsDelivr and Google's model bucket on the first match.
+`?lens=2d` forces the flat costumes.
 
 **Fallback: `human`** (`?engine=human`): Human's FaceRes 1024-float descriptor with
 Human's distance-based similarity. Weaker separation, kept for comparison.
