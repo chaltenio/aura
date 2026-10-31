@@ -271,6 +271,7 @@ export function costumeLayer(wrap, { threshold = 0 } = {}) {
     const now = performance.now(), still = !source.videoWidth, seen = new Set(); // a test photo keeps its costume until the next frame
     for (const r of results) {
       const a = r.attendee, costume = a && COSTUMES[a.costume];
+      if (a && !costume && faces.has(a.id)) { faces.get(a.id).until = 0; continue; } // took it off on /me while in view: fade now
       if (!costume || !r.mesh || r.mesh.length < 468 || r.similarity < threshold) continue;
       let e = faces.get(a.id);
       if (!e && !isConfirmed(a.id)) continue;
@@ -278,7 +279,7 @@ export function costumeLayer(wrap, { threshold = 0 } = {}) {
       if (!e) {
         faces.set(a.id, e = { cur: rig.slice(), alpha: 0 });
         if (now - (stung.get(a.id) ?? -Infinity) > STING_GAP_MS) { stung.set(a.id, now); playSting(a.costume); }
-      }
+      } else if (e.costume !== costume) { stung.set(a.id, now); playSting(a.costume); } // switched on /me while in view: the new look arrives with its sound
       e.costume = costume; e.target = rig; e.until = still ? Infinity : now + 600; seen.add(a.id);
     }
     for (const [id, e] of faces) if (!seen.has(id) && e.until > now + 600) e.until = now; // a held photo face that is gone now fades

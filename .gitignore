@@ -40,6 +40,9 @@ tmp/
 # runtime data
 data/
 
+# Base44 CLI link file (the app id lives in scripts/base44.mjs)
+base44/.app.jsonc
+
 # integrator state
 .integrator-last
 

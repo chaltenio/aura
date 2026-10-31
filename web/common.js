@@ -4,16 +4,31 @@ export const getMe = () => { try { return JSON.parse(localStorage.getItem(ME_KEY
 export const setMe = (me) => { try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch {} };
 export const clearMe = () => { try { localStorage.removeItem(ME_KEY); } catch {} };
 
+// Where the API and /ws live. '' = this origin (Fly serves pages and API together). The Base44 mirror
+// (scripts/base44.mjs) puts window.HAUNT_API = the Fly URL in every page's <head>, so the same pages call the Fly
+// API and socket cross-origin and both URLs share one room. Call the API only through api() / API + path.
+export const API = String(globalThis.HAUNT_API || '').replace(/\/+$/, '');
+// Cross-origin sign-in: a cookie on the API's domain would be a third-party cookie here, so the OAuth callback hands
+// the session back in the URL fragment (#haunt_session=...; server/auth.js) and api() sends it as a header.
+const SESSION_KEY = 'haunt.session';
+const getSession = () => { try { return localStorage.getItem(SESSION_KEY) || ''; } catch { return ''; } };
+{ const m = location.hash.match(/^#haunt_session=([\w-]+\.[\w-]+)$/); if (m) { try { localStorage.setItem(SESSION_KEY, m[1]); } catch {} history.replaceState(null, '', location.pathname + location.search); } }
+/** Href that starts OAuth sign-in with `provider` and comes back to this page signed in, on either origin. */
+export const signInHref = (provider) => `${API}/auth/${encodeURIComponent(provider)}${API ? `?return=${encodeURIComponent(location.origin + location.pathname)}` : ''}`;
+
 export async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const headers = body ? { 'content-type': 'application/json' } : {};
+  // only where the server reads the session (writes, /api/session*), so plain GETs stay simple requests with no preflight
+  const sess = getSession(); if (sess && (method !== 'GET' || path.startsWith('/api/session'))) headers['x-haunt-session'] = sess;
+  const res = await fetch(API + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const err = new Error(data.error || res.statusText); err.status = res.status; err.data = data; throw err; }
   return data;
 }
 
 export function connectWs(params, onMessage) {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${proto}://${location.host}/ws?${new URLSearchParams(params)}`;
+  const base = new URL(API || location.origin);
+  const url = `${base.protocol === 'https:' ? 'wss' : 'ws'}://${base.host}/ws?${new URLSearchParams(params)}`;
   let ws, closed = false, delay = 500;
   const open = () => {
     ws = new WebSocket(url);
@@ -64,7 +79,10 @@ export function flash() {
 }
 export function toast(html, ms = 5000) {
   let el = document.querySelector('.toast');
-  if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
+  if (!el) {
+    el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'alert'); document.body.appendChild(el);
+    el.addEventListener('click', (e) => { if (!e.target.closest('button, a')) el.classList.remove('show'); }); // tap the alert to dismiss it
+  }
   el.innerHTML = html; el.classList.add('show');
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), ms);
 }
@@ -72,9 +90,13 @@ export function hauntedAlert(msg) {
   shriek(); flash();
   const by = msg.by || {}; const name = esc(by.name || 'someone');
   const canBack = !msg.back && by.id && getMe(); // a haunt back gets no button, so it can't ping-pong
-  toast(`<b>${msg.back ? `👻 ${name} haunted you back!` : `👻 You've been haunted by ${name}`}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}${canBack ? '<button class="haunt-back">Haunt back</button>' : ''}`, 12000);
+  const av = by.avatar ? `<img class="t-av" src="${esc(by.avatar)}" alt="">` : ''; // their face: so you can spot who it was in the room
+  toast(`<div class="t-row">${av}<div><b>${msg.back ? `👻 ${name} haunted you back!` : `👻 You've been haunted by ${name}`}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}</div></div>${canBack ? '<button class="haunt-back">Haunt back</button>' : ''}`, 12000);
   const btn = canBack && document.querySelector('.toast .haunt-back');
-  if (btn) btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = await hauntBack(by); });
+  if (btn) btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Haunting…'; btn.textContent = await hauntBack(by);
+    const el = document.querySelector('.toast'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2500);
+  });
 }
 /** Haunt back whoever haunted this phone (`by` = card from the haunted push). Call from a tap. Returns a short status for the UI. */
 export async function hauntBack(by) {

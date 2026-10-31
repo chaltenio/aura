@@ -8,9 +8,10 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mountAuth, sessionProfile } from './auth.js';
-import { ensureProfile } from './profile.js';
+import { ensureProfile, profileLoading } from './profile.js';
 import { mountAdmin } from './admin.js';
 import { deployInfo } from './version.js';
+import { cors } from './cors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -56,13 +57,24 @@ const byId = (id) => db.attendees.find((a) => a.id === id);
 const cleanCostume = (c) => (typeof c === 'string' && /^[a-z]{1,20}$/.test(c) && c !== 'plain' ? c : null);
 const publicCard = (a) => ({
   id: a.id, name: a.name, handle: a.handle || '', blurb: a.blurb || '', linkedin: a.linkedin || '', profile: a.profile && !a.profile.error ? a.profile : null,
+  profileLoading: profileLoading(a), // a GitHub lookup is running; the card is pushed again when it lands. Always a boolean: phones merge pushes
   avatar: a.avatar || null, consent: !!a.consent, costume: a.costume || null,
   hauntedCount: db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).length,
   huntCount: db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).length,
 });
+// A profile edit reaches every open page at once (#30): the changed card itself is pushed, so /hunt patches the person it
+// already holds (their costume changes on the next frame, an open card re-renders) instead of refetching every face in the
+// gallery. Someone not findable (opted out, blocked) goes out as their id only, never their card. No avatar: /me cannot change it.
+function pushCard(a) {
+  if (!a.consent || a.blocked) return broadcast({ type: 'attendee_gone', id: a.id });
+  const card = publicCard(a); delete card.avatar;
+  broadcast({ type: 'attendee_changed', attendee: card });
+}
+const cardChanged = (a) => { save(); pushCard(a); }; // a GitHub lookup landed on this card
 
 // ---------- app ----------
 const app = express();
+app.use('/api', cors); // the Base44 mirror of web/ calls the API cross-origin (server/cors.js, FRONTEND_ORIGINS)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
 if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
@@ -94,7 +106,7 @@ app.post('/api/attendee', (req, res) => {
     createdAt: Date.now(),
   };
   db.attendees.push(a); save();
-  ensureProfile(a, save, 0).catch(() => {}); // warm the GitHub profile cache in the background
+  ensureProfile(a, cardChanged, 0).catch(() => {}); // warm the GitHub profile cache in the background; the card is pushed when it lands
   broadcast({ type: 'gallery_changed' });
   broadcastScreen({ type: 'joined', attendee: publicCard(a) });
   res.json({ id: a.id, token: a.token });
@@ -111,7 +123,7 @@ app.get('/api/gallery', (_req, res) => {
 app.get('/api/attendee/:id', async (req, res) => {
   const a = byId(req.params.id);
   if (!a) return res.status(404).json({ error: 'not found' });
-  await ensureProfile(a, save).catch(() => {});
+  await ensureProfile(a, cardChanged).catch(() => {});
   res.json(publicCard(a));
 });
 
@@ -120,7 +132,7 @@ app.get('/api/attendee/:id', async (req, res) => {
 app.get('/api/me/:id', async (req, res) => {
   const a = byId(req.params.id);
   if (!a || a.token !== req.query.token) return res.status(403).json({ error: 'forbidden' });
-  await ensureProfile(a, save).catch(() => {});
+  await ensureProfile(a, cardChanged).catch(() => {});
   const received = [], given = [], conns = new Map(); // otherId -> { card, youHaunted, hauntedYou, lastAt }
   for (const e of db.events) {
     const mine = e.actorId === a.id;
@@ -136,17 +148,22 @@ app.get('/api/me/:id', async (req, res) => {
   res.json({ me: publicCard(a), received: received.reverse(), given: given.reverse(), connections });
 });
 
-// kill switch
+// profile edits and the kill switch. Every change reaches every open page at once (pushCard).
 app.patch('/api/attendee/:id', (req, res) => {
   const a = byId(req.params.id);
   if (!a || a.token !== req.body?.token) return res.status(403).json({ error: 'forbidden' });
+  const wasFindable = a.consent && !a.blocked;
   if (typeof req.body.consent === 'boolean') a.consent = req.body.consent;
   if (typeof req.body.blurb === 'string') a.blurb = req.body.blurb.trim().slice(0, 200);
-  if (typeof req.body.handle === 'string') { a.handle = req.body.handle.trim().replace(/^@/, '').slice(0, 60); a.profile = null; ensureProfile(a, save, 0).catch(() => {}); }
+  if (typeof req.body.handle === 'string') {
+    const handle = req.body.handle.trim().replace(/^@/, '').slice(0, 60);
+    if (handle !== a.handle) { a.handle = handle; a.profile = null; ensureProfile(a, cardChanged, 0).catch(() => {}); } // an unchanged handle keeps its profile
+  }
   if (typeof req.body.linkedin === 'string') a.linkedin = /^https?:\/\/(www\.)?linkedin\.com\//.test(req.body.linkedin) ? req.body.linkedin.slice(0, 200) : '';
   if ('costume' in req.body) a.costume = cleanCostume(req.body.costume);
   save();
-  broadcast({ type: 'gallery_changed' });
+  // findable again: phones need this face's descriptors back, so they refetch the gallery; every other edit is pushed as the card
+  if (!wasFindable && a.consent && !a.blocked) broadcast({ type: 'gallery_changed' }); else pushCard(a);
   res.json(publicCard(a));
 });
 
