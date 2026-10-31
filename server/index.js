@@ -15,7 +15,6 @@ const ROOT = join(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
 const DB_PATH = join(DATA_DIR, 'db.json');
 const PORT = Number(process.env.PORT || 3000);
-const HAUNT_COOLDOWN_MS = 60_000;
 const STARTED_AT = Date.now();
 
 // ---------- FaceX weights (gitignored binaries; fetched from the FaceX GitHub release on first start) ----------
@@ -142,20 +141,16 @@ app.patch('/api/attendee/:id', (req, res) => {
   res.json(publicCard(a));
 });
 
-// haunt: actor found target
-const lastHaunt = new Map(); // `${actor}:${target}` -> ts
+// haunt: actor found target. No rate limit: a repeat haunt on the same person is written and pushed like the first.
 app.post('/api/haunt', (req, res) => {
   const { actorId, token, targetId, similarity } = req.body || {}; const back = req.body?.back === true;
   const actor = byId(actorId); const target = byId(targetId);
   if (!actor || actor.token !== token) return res.status(403).json({ error: 'forbidden' });
   if (!target || !target.consent) return res.status(404).json({ error: 'target not findable' });
   if (actor.id === target.id) return res.status(400).json({ error: 'cannot haunt yourself' });
-  // haunt back: only toward someone who haunted you first (checked before the cooldown, so a refusal costs nothing)
+  // haunt back: only toward someone who haunted you first
   if (back && !db.events.some((e) => e.type === 'haunt' && e.actorId === target.id && e.targetId === actor.id)) return res.status(400).json({ error: 'nothing to haunt back' });
-  const key = `${actor.id}:${target.id}`;
   const now = Date.now();
-  if (now - (lastHaunt.get(key) || 0) < HAUNT_COOLDOWN_MS) return res.status(429).json({ error: 'cooldown', card: publicCard(target) });
-  lastHaunt.set(key, now);
   const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now, ...(back && { back: true }) };
   db.events.push(ev); save();
   sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now, ...(back && { back: true }) });

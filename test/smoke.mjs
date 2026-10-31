@@ -56,16 +56,17 @@ try {
   check(h1.status === 200 && h1.data.card?.name === 'Bob', 'haunt succeeds and returns target card');
   const push = await Promise.race([got, new Promise((r) => setTimeout(() => r(null), 3000))]);
   check(push && push.by?.name === 'Ada' && !push.by.token, 'target receives haunted push with actor card');
-  check((await json('/api/haunt', { method: 'POST', body: { actorId: a.id, token: a.token, targetId: b.id } })).status === 429, 'second haunt within cooldown -> 429');
+  const h2 = await json('/api/haunt', { method: 'POST', body: { actorId: a.id, token: a.token, targetId: b.id } });
+  check(h2.status === 200 && h2.data.card?.name === 'Bob', 'no rate limit: a second haunt right away -> 200 with the card');
   check((await json('/api/haunt', { method: 'POST', body: { actorId: a.id, token: 'nope', targetId: b.id } })).status === 403, 'bad token -> 403');
   check((await json('/api/haunt', { method: 'POST', body: { actorId: a.id, token: a.token, targetId: a.id } })).status === 400, 'self-haunt -> 400');
 
   const me = (await json(`/api/me/${b.id}?token=${b.token}`)).data;
-  check(me.received?.length === 1 && me.received[0].by.name === 'Ada', '/me lists who haunted you');
+  check(me.received?.length === 2 && me.received.every((r) => r.by.name === 'Ada'), '/me lists who haunted you, one row per haunt');
   check((await json(`/api/me/${b.id}?token=bad`)).status === 403, '/me with bad token -> 403');
 
   const ev = (await json('/api/events')).data;
-  check(ev.events?.length === 1 && ev.attendees?.length === 2, '/api/events feed + attendee list');
+  check(ev.events?.length === 2 && ev.attendees?.length === 2, '/api/events feed + attendee list');
 
   // kill switch removes Bob from the gallery
   check((await json(`/api/attendee/${b.id}`, { method: 'PATCH', body: { token: b.token, consent: false } })).status === 200, 'PATCH consent');
@@ -100,7 +101,7 @@ try {
     check(hb.status === 200 && hb.data.card?.name === 'Cy', 'haunt back after being haunted -> 200 with the card');
     const backPush = await Promise.race([cyGot, new Promise((r) => setTimeout(() => r(null), 3000))]);
     check(backPush?.back === true && backPush.by?.name === 'Dee', 'haunted-back phone gets haunted with back:true and the right by.name');
-    check((await haunt(dee, cy, { back: true })).status === 429, 'haunt back keeps the 60 s cooldown');
+    check((await haunt(dee, cy, { back: true })).status === 200, 'no rate limit: a second haunt back right away -> 200');
     check((await haunt(eve, cy, { back: true })).status === 400, 'haunt back toward someone who never haunted you -> 400');
     const evs = (await json('/api/events?limit=50')).data.events || [];
     const pair = (from, to) => evs.find((e) => e.type === 'haunt' && e.actorId === from.id && e.targetId === to.id);
@@ -112,4 +113,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, cooldown, kill switch, static routes)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, static routes)');

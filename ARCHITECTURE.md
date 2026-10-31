@@ -171,8 +171,9 @@ on a `gallery_changed` socket message).
 | GET | `/api/version` | `{version, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`), boot time, counts. Used by deploy and integrator checks |
 | WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores) |
 
-Rate-limit haunts per pair (one per 60 s) so a phone pointed at someone does not
-spam them.
+No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
+pushed like the first (no 429). `/hunt` still sends one haunt per card: the button
+re-arms only after the card closes and that person is found again.
 
 ## 4. Flows
 
@@ -237,7 +238,7 @@ every phone within one refresh.
 2. **PR 2, hunt:** `/hunt` camera loop, matching, card overlay, `/api/haunt`,
    socket push, shriek + flash. This is the demo.
 3. **PR 3, polish:** GitHub OAuth, LinkedIn OIDC, `/screen` feed and leaderboard,
-   rate limits, kill switch broadcast.
+   kill switch broadcast.
 
 Then layers 4 to 6 from the README.
 
