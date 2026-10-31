@@ -65,11 +65,14 @@ if (getMe()) status('You are already registered on this phone. Registering again
     const session = await api('/api/session');
     if (!providers.length && !session) return;
     $('auth').hidden = false;
-    const labels = { linkedin: 'Sign in with LinkedIn', github: 'Sign in with GitHub' };
+    const labels = { linkedin: 'LinkedIn', github: 'GitHub', google: 'Google', apple: 'Apple' };
+    const btn = (p, verb) => `<a href="/auth/${p}"><button class="secondary">${verb} ${labels[p] || p}</button></a>`;
     if (!session) {
-      $('auth-buttons').innerHTML = providers.map((p) => `<a href="/auth/${p}"><button class="secondary">${labels[p] || p}</button></a>`).join('');
+      $('auth-buttons').innerHTML = providers.map((p) => btn(p, 'Sign in with')).join('');
     } else {
-      $('auth-session').innerHTML = `Signed in as <b>${session.name}</b> via ${session.provider}${session.avatar ? ` <img src="${session.avatar}" style="width:40px;height:40px;border-radius:50%;vertical-align:middle;margin-left:8px">` : ''}`;
+      const more = providers.filter((p) => !session.linked.includes(p));
+      $('auth-buttons').innerHTML = more.map((p) => btn(p, 'Also link')).join('');
+      $('auth-session').innerHTML = `Signed in as <b>${session.name || 'you'}</b> via ${session.linked.map((p) => labels[p] || p).join(' + ')}${session.avatar ? ` <img src="${session.avatar}" style="width:40px;height:40px;border-radius:50%;vertical-align:middle;margin-left:8px">` : ''}`;
       if (!$('name').value) $('name').value = session.name || '';
       if (!$('handle').value) $('handle').value = session.handle || '';
       refresh();
