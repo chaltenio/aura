@@ -8,6 +8,8 @@ primary_region = "sjc"
 [env]
   PORT = "3000"
   DATA_DIR = "/data"
+  # Frontends on other origins that may call this API and get sign-in handoffs (server/cors.js): the Base44 mirror.
+  FRONTEND_ORIGINS = "https://aura-haunt.base44.app"
 
 [http_service]
   internal_port = 3000
