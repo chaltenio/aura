@@ -28,7 +28,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 21 | Admin panel `/admin`: attendees, allow/disallow, direct + group messages, open/close events (`ADMIN_TOKEN`) | Chris | [ ] |
 | 11 | Roles on join (Hunter / Ghost / Medium / Possessed) and role-gated views | | [ ] |
 | 12 | Narrator agent: event feed -> Claude -> TTS on `/screen` | | [ ] |
-| 13 | Room scan: Scaniverse -> SPZ -> Spark on `/screen` with live markers | | [ ] |
+| 13 | Room scan: Scaniverse -> SPZ -> Spark on a new `/room` page, ghosts on live haunts. Brief: docs/ROOM_SCAN.md. Matt is offering it to tarecq (15:05) | | [ ] |
 | 14 | Sigil posters (AR.js pattern markers + QR fallback) and `/zone` events | | [ ] |
 | 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | | [ ] |
 | 16 | Feedback swap with one other team (Stranger Builds requirement) and one change from it | | [ ] |
