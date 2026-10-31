@@ -72,7 +72,7 @@ flowchart LR
     cfd["cloudflared quick tunnel<br/>npm run tunnel, forwards to localhost:3000"]
     subgraph srv["server/index.js: Express + ws on port 3000"]
       direction TB
-      stat["static web/ (extensions: html)<br/>/vendor/facex: facex.js, facex.wasm, alignToArcFace<br/>edgeface_xs_fp32.bin (gitignored)"]
+      stat["static web/ (extensions: html)<br/>/vendor/facex: facex.js, facex.wasm (align.js, detect.js unused)<br/>edgeface_xs_fp32.bin (gitignored)"]
       api["JSON API (5 MB body limit)<br/>POST /api/attendee, GET /api/gallery<br/>GET /api/attendee/:id, GET /api/me/:id<br/>PATCH /api/attendee/:id, POST /api/haunt<br/>GET /api/events"]
       wsrv["WebSocket /ws (server to client only)<br/>?attendee=id into sockets map<br/>?screen=1 into screens set<br/>sendTo(), broadcast(), broadcastScreen()"]
       cool["in-memory haunt cooldown<br/>60 s per actor:target pair"]
