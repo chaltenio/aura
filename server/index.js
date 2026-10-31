@@ -45,7 +45,7 @@ async function ensureWeights() {
 // ---------- storage ----------
 mkdirSync(DATA_DIR, { recursive: true });
 const VERSION = deployInfo(DATA_DIR); // { version: git sha, deploy: v-number (+1 per deploy), deployedAt }
-console.log(VERSION.deploy ? `deploy v${VERSION.deploy} (${VERSION.version})` : 'dev build (no deploy number)');
+console.log(VERSION.deploy ? `deploy v${VERSION.deploy} (${VERSION.version})` : `${VERSION.version} build (no deploy number)`);
 const db = existsSync(DB_PATH)
   ? JSON.parse(readFileSync(DB_PATH, 'utf8'))
   : { attendees: [], events: [] };

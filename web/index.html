@@ -30,7 +30,7 @@
 <script>// deploy number: one more on every deploy (server/version.js)
 fetch((window.HAUNT_API || '') + '/api/version', { cache: 'no-store' }).then((r) => r.json()).then((v) => {
   const when = v.deployedAt ? new Date(v.deployedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
-  document.getElementById('version').textContent = (v.deploy ? `v${v.deploy} · ${v.version}${when ? ` · deployed ${when}` : ''}` : 'dev build') + (window.HAUNT_MIRROR ? ` · ${window.HAUNT_MIRROR}` : '');
+  document.getElementById('version').textContent = (v.deploy ? `v${v.deploy} · ${v.version}${when ? ` · deployed ${when}` : ''}` : v.version && v.version !== 'dev' ? v.version : 'dev build') + (window.HAUNT_MIRROR ? ` · ${window.HAUNT_MIRROR}` : '');
 }).catch(() => {});</script>
 <script>// already registered on this phone: lead with Hunt and your card; registering again would replace your card
 try {

@@ -3,11 +3,13 @@
 // A deploy is a boot whose build differs from the last one: Fly gives every `fly deploy` (CI on main,
 // scripts/deploy.sh, a rollback) a new FLY_IMAGE_REF, while a restart or a secrets change keeps it, so the number
 // stays. Off Fly the git sha (APP_VERSION) stands in; a dev build (neither set) has no number.
+// Vercel has no volume, so a counter would restart on every cold start: it reports its git sha and no number.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function deployInfo(dataDir, env = process.env, now = Date.now()) {
-  const version = env.APP_VERSION || 'dev';
+  const version = env.APP_VERSION || env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev';
+  if (env.VERCEL) return { version, deploy: null, deployedAt: null };
   const build = env.FLY_IMAGE_REF || (version === 'dev' ? '' : version);
   if (!build) return { version, deploy: null, deployedAt: null };
   const file = join(dataDir, 'version.json');

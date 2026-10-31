@@ -43,6 +43,9 @@ try {
     const got = [img(1), img(1), img(2), img(3, 'def5678'), {}, img(3, 'def5678')].map((env, i) => deployInfo(dir, env, 1000 + i));
     const want = [[1, 1000], [1, 1000], [2, 1002], [3, 1003], [null, null], [3, 1003]];
     check(JSON.stringify(got.map((v) => [v.deploy, v.deployedAt])) === JSON.stringify(want), `deploy counter: ${JSON.stringify(got)}`);
+    const vercel = deployInfo(dir, { VERCEL: '1', VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' }, 2000);
+    check(vercel.version === '0123456' && vercel.deploy === null && vercel.deployedAt === null, `Vercel reports its sha and no number: ${JSON.stringify(vercel)}`);
+    check(deployInfo(dir, { VERCEL: '1' }).version === 'dev', 'Vercel without system env vars stays a dev build');
   }
   { // Base44 mirror (#32): CORS for FRONTEND_ORIGINS only; sign-in comes back to the mirror page as #haunt_session, used as a header
     const pre = (origin) => fetch(BASE + '/api/attendee', { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-haunt-session' } });
