@@ -172,30 +172,31 @@ function cameraHelp(e) {
   return `Camera error: ${e?.message || e}`;
 }
 
-let frames = 0;
-async function loop() {
-  if (!running) return;
+let frames = 0, loopId = 0; // a new start() bumps loopId, so a timer left over from before an app switch cannot run a second loop
+async function loop(id) {
+  if (!running || id !== loopId) return;
   const v = $('video');
   if (engine && v.videoWidth) {
     const t = performance.now();
     try { const r = await processFrame(v); frames++; if (frames % 5 === 0) { const fps = (1000 / Math.max(1, performance.now() - t)).toFixed(1); const best = r.reduce((m, x) => Math.max(m, x.similarity), 0); status(`${r.length} face(s) · best ${(best * 100).toFixed(0)}% · ${fps} fps · threshold ${(THRESHOLD * 100).toFixed(0)}%`); } }
     catch (e) { status('detect error: ' + e.message); }
   }
-  setTimeout(loop, 120); // ~4 fps target; detection itself takes most of it
+  setTimeout(() => loop(id), 120); // ~4 fps target; detection itself takes most of it
 }
+let starting = false;
 async function start() {
-  if (running || !engine) return;
-  wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
+  if (running || starting || !engine) return;
+  starting = true; wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
   try {
     stream = await navigator.mediaDevices.getUserMedia(await pickRearCamera());
     $('video').srcObject = stream; await $('video').play().catch(() => {});
     $('idle').hidden = true; running = true; wakeLock();
     $('hud-state').innerHTML = '<span class="dot"></span>Scanning'; hint('Point at a face');
-    loop();
+    loop(++loopId);
   } catch (e) {
     wantRunning = false; $('idle').hidden = false; $('start').disabled = false; $('start').textContent = 'Try again';
     $('idle-sub').textContent = cameraHelp(e); status('Camera blocked: ' + e.message);
-  }
+  } finally { starting = false; }
 }
 // camera already allowed on this phone (a return visit): start without the extra tap
 async function autoStart() { try { if ((await navigator.permissions?.query({ name: 'camera' }))?.state === 'granted') start(); } catch {} }
