@@ -1,11 +1,11 @@
 ---
 name: merge
-description: Merge resolver for the HAUNT repo. Lands the current branch on main: fetch, rebase onto origin/main (merge main in if the rebase is messy), resolve conflicts keeping both sides' intent and the API shapes in ARCHITECTURE.md, run the checks, fast-forward main, delete the branch, post to the bus, log it. Stops and asks the owner on the bus if a conflict cannot be resolved with confidence. Use when someone says "merge", "land this", "integrate my branch", "/merge", or a branch is ready for main.
+description: Merge resolver for the HAUNT repo. Lands the current branch on main as a merged PR: fetch, bring origin/main in (merge into a pushed branch, rebase only a never-pushed one), resolve conflicts keeping both sides' intent and the API shapes in ARCHITECTURE.md, run the checks, then scripts/land.sh fast-forwards main to the PR's head (GitHub shows it merged), deletes the branch, posts to the bus, prints the log line. Stops and asks the owner on the bus if a conflict cannot be resolved with confidence. Use when someone says "merge", "land this", "integrate my branch", "/merge", or a branch is ready for main.
 ---
 
 # Merge resolver
 
-Only this skill moves `main`. It lands one branch at a time. Never force-push. Never drop a function, route, event, style rule, or doc line from either side to make a conflict go away.
+Only this skill moves `main`. It lands one branch at a time, always as a PR that GitHub shows merged. Never force-push. Never drop a function, route, event, style rule, or doc line from either side to make a conflict go away.
 
 ## 1. Preflight
 
@@ -21,14 +21,14 @@ git diff --stat origin/main...HEAD
 ```
 Read TODO.md and the last 10 bus messages (`scripts/bus.sh read 10`) so you know who owns what.
 
-## 2. Rebase (default) or merge main in (fallback)
+## 2. Bring main in: merge into a pushed branch, rebase only one that was never pushed
 
 ```bash
-git rebase origin/main
-```
-If the rebase hits the same conflict in several commits, or the branch has 20+ commits, abort and merge instead:
-```bash
-git rebase --abort && git merge origin/main
+if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+  git merge origin/main      # pushed (always, after sync.sh or ready.sh): a rebase would need a force-push, and the PR's head would never reach main
+else
+  git rebase origin/main     # never pushed: nobody else has these commits
+fi
 ```
 Either way, each conflict is resolved the same way, below.
 
@@ -60,28 +60,25 @@ node -e 'const p=require("./package.json");process.exit(p.scripts&&p.scripts.tes
 ```
 A failing test after a clean-looking merge is a semantic conflict. Fix it on the branch before landing.
 
-## 5. Land: fast-forward main, delete the branch, tell the team
+## 5. Land: fast-forward main to the PR's head, delete the branch, tell the team
 
 ```bash
 export MERGE_SKILL=1
-git push -q -u origin HEAD                          # rebased branch, so reviewers can see it
-git switch main && git pull --ff-only -q origin main
-git merge --ff-only "$branch" && git push -q origin main
-pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')   # deleting the branch closes its PR: say why first (CLAUDE.md)
-[ -n "$pr" ] && gh pr comment "$pr" --body "Landed on main as $(git rev-parse --short origin/main) via /merge. The commits were rebased, so GitHub shows this PR as closed, not merged."
-git branch -d "$branch" && git push -q origin --delete "$branch"
-git switch -c "$(git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')/next" 2>/dev/null || true   # never stay on main
-scripts/bus.sh post "merged $branch into main: <one line on what landed>"
-echo "- $(date '+%Y-%m-%d %H:%M')  merged $branch ($(git rev-parse --short origin/main)) | test: pass | <conflicts resolved, if any>" >> docs/INTEGRATION_LOG.md
+scripts/land.sh "$branch" "<one line on what landed>"
 ```
-If `git log origin/main..HEAD` is empty after the rebase, the branch was already landed: comment that on its PR and post it on the bus, never `[MERGED]`. Commit the INTEGRATION_LOG line on your next branch, not on main. If `--ff-only` fails because main moved while you were resolving, go back to step 2.
+`land.sh` pushes the branch (fast-forward), opens its PR if `scripts/ready.sh` has not already (`scripts/pr.sh`), pushes the same commit to `main`, waits until GitHub shows the PR as merged, deletes the branch, posts `[MERGED]` and prints the INTEGRATION_LOG line. Exit 3 means main moved while you were checking: go back to step 2. If it says the branch is already on main, nothing landed: say that on its PR and the bus, never `[MERGED]`.
+
+Then leave the landed branch, and commit the log line on your next branch, not on main:
+```bash
+git fetch -q origin && git switch -q --detach origin/main && git branch -q -d "$branch"
+git switch -c "$(git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')/next" 2>/dev/null || true   # never stay on main
+```
 
 ## 6. When you cannot resolve with confidence
 
 Stop. Do not guess at someone else's intent.
 ```bash
-git add -A -- <files you did resolve>; git rebase --continue   # as far as it goes
-git push -q -u origin HEAD                                       # branch stays rebased as far as it got
+git merge --abort      # or git rebase --abort for a never-pushed branch; nothing was pushed, the branch on origin is untouched
 scripts/bus.sh ask "merge blocked on <branch>: <file> <what both sides want>. @<owner> which wins?"
 ```
 Then report in chat which file, which two intents, and the question you asked.

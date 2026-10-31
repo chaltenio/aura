@@ -31,7 +31,7 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
      echo "$b ahead=$(git rev-list --count origin/main..$b) last=$(git log -1 --format=%cr $b) diverged=$(git log -1 --format=%cr $(git merge-base origin/main $b))"
    done
    ```
-   A branch that diverged from main more than ~45 minutes ago, or whose last commit is older than 45 minutes with unmerged work, gets a nudge on the bus: `scripts/bus.sh post "@<owner> <branch> has been away from main for <time>; run /merge when the next step works"`. Owner = the `<name>/` prefix. Two branches touching the same file (`git diff --name-only origin/main...<b>` overlaps) get named together so the first to `/merge` warns the second.
+   A branch that diverged from main more than ~45 minutes ago, or whose last commit is older than 45 minutes with unmerged work, gets a nudge on the bus: `scripts/bus.sh post "@<owner> <branch> has been away from main for <time>; run scripts/ready.sh when the next step works"`. Owner = the `<name>/` prefix. Two branches touching the same file (`git diff --name-only origin/main...<b>` overlaps) get named together so the first to `/merge` warns the second.
 
 3. **Bring the integrator worktree up to date** (never touch the human's working tree):
    ```bash
@@ -39,7 +39,7 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    ```
    The integrator tab should run from its own worktree (`EnterWorktree` or `git worktree add ../haunt-integrator main`) so a teammate's uncommitted edits are never stashed.
 
-4. **Merge branches marked READY** (the merge agent that comes online by itself). Teammates post `scripts/bus.sh ready "<branch>: what it does"` when a branch is done. Find the ones not yet in main:
+4. **Merge branches marked READY** (the merge agent that comes online by itself). A finished job runs `scripts/ready.sh`, which opens the branch's PR and posts `[READY] <branch>: what it does (PR #n)`; a bare `scripts/bus.sh ready` line counts too (land.sh opens its PR). Find the ones not yet in main:
    ```bash
    export INTEGRATOR=1 MERGE_SKILL=1
    ready=$(scripts/bus.sh read 80 | awk -F'  ' '/\[READY\]/{split($2,a,":"); print a[1]}' | sort -u)
@@ -48,17 +48,14 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    Then, one branch at a time, in the integrator's own worktree (never a human's checkout):
    ```bash
    git switch -q -C "merge/$b" "origin/$b"
-   git rebase origin/main          # conflicts: resolve per .claude/skills/merge/SKILL.md step 3 (keep both intents; ARCHITECTURE.md wins on API shapes)
+   git merge --no-edit origin/main  # never rebase a pushed branch (no force-push; the PR's head must reach main). Conflicts: resolve per .claude/skills/merge/SKILL.md step 3 (keep both intents; ARCHITECTURE.md wins on API shapes)
    grep -rn '^<<<<<<<\|^>>>>>>>' --include='*.js' --include='*.html' --include='*.css' --include='*.md' . && exit 1
    for f in $(git diff --name-only origin/main...HEAD | grep -E '\.m?js$'); do node --check "$f" || exit 1; done
-   npm test --silent                # red after a clean-looking rebase = semantic conflict; run the merge skill's checklist (duplicate routes, renamed functions, duplicate ids, TODO STATUS)
-   git push -q origin HEAD:main     # fast-forward
-   pr=$(gh pr list --head "$b" --state open --json number --jq '.[0].number')   # deleting the branch closes its PR: say why first (CLAUDE.md)
-   [ -n "$pr" ] && gh pr comment "$pr" --body "Landed on main as $(git rev-parse --short origin/main) by the integrator. The commits were rebased, so GitHub shows this PR as closed, not merged."
-   git push -q origin --delete "$b"; git switch -q --detach origin/main; git branch -q -D "merge/$b"
-   scripts/bus.sh merged "$b into main ($(git rev-parse --short origin/main)): <one line on what landed>"
+   npm test --silent                # red after a clean-looking merge = semantic conflict; run the merge skill's checklist (duplicate routes, renamed functions, duplicate ids, TODO STATUS)
+   scripts/land.sh "$b" "<one line on what landed>"   # pushes the branch, opens its PR if missing, fast-forwards main to it (GitHub shows the PR merged), deletes the branch, posts [MERGED]; exit 3 = main moved, merge origin/main again
+   git switch -q --detach origin/main; git branch -q -D "merge/$b"
    ```
-   If a conflict cannot be resolved with confidence, or the test is red after the rebase: keep what resolved cleanly (`git rebase --continue` as far as it goes, otherwise `git rebase --abort`), `git push --force-with-lease origin HEAD:"$b"` so the branch stays rebased as far as it got, post `scripts/bus.sh ask "@<owner> conflict in <files> on $b: <both intents in one line>"`, and move on to the next branch. Never push a red main.
+   If a conflict cannot be resolved with confidence, or the test is red after the merge: `git merge --abort` (nothing was pushed, the branch is untouched), post `scripts/bus.sh ask "@<owner> conflict in <files> on $b: <both intents in one line>"`, and move on to the next branch. Never push a red main, never force-push.
 
 5. **Run the smoke test** if `package.json` has a `test` script: `npm test --silent`. Otherwise `node --check server/index.js` and `curl -fsS localhost:3000/api/gallery` if a server is running. Record pass/fail.
 
@@ -102,8 +99,8 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 ## Escalate, do not fix
 
 - Test failing on main for two passes: say "main is red since HH:MM, <name>'s commit <sha>; everyone pull but do not push until green" and ping the author.
-- Two people editing the same file: ask one to stop and the other to push first, or ask the second to rebase now.
-- A PR that cannot merge: ask the author to rebase; do not merge PRs yourself unless the user told you to.
+- Two people editing the same file: ask one to stop and the other to push first, or ask the second to run `scripts/sync.sh` now.
+- A PR is landed only when its branch has a `[READY]` line. An open PR without one: ask the author to run `scripts/ready.sh` when it is done. A PR that conflicts with main: ask the author to run `scripts/sync.sh` (it merges main in), never to rebase.
 - Anything you would need to change in `web/` or `server/` to resolve: write the exact change in chat and let the owner apply it.
 
 ## Driving it
