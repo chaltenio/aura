@@ -1,0 +1,19 @@
+name: ci
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: syntax check server
+        run: for f in server/*.js; do node --check "$f"; done
+      - name: smoke test (boots server, exercises API + WebSocket push)
+        run: npm test

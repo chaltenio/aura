@@ -1,0 +1,23 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+jobs:
+  fly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: has deploy token?
+        id: tok
+        run: echo "has=${{ secrets.FLY_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.tok.outputs.has == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - if: steps.tok.outputs.has == 'true'
+        run: flyctl deploy --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - if: steps.tok.outputs.has != 'true'
+        run: echo "FLY_API_TOKEN not set; skipping deploy (see docs/DEPLOY.md)"
