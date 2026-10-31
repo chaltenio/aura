@@ -84,6 +84,25 @@ try {
     check(m2.connections?.length === 1 && !row(m2, di), 'opted-out counterpart leaves /me connections');
     check(m2.received?.length === 1 && m2.received[0].by.id === ed.id && m2.given?.length === 0, 'opted-out counterpart leaves /me received and given');
   }
+  { // haunt back (#18): Cy haunts Dee, Dee haunts back, Cy's socket hears back:true; Eve was never haunted by Cy -> 400
+    const reg = async (name) => (await json('/api/attendee', { method: 'POST', body: { name, consent: true, descriptors: [vec()] } })).data;
+    const cy = await reg('Cy'), dee = await reg('Dee'), eve = await reg('Eve');
+    const haunt = (from, to, extra = {}) => json('/api/haunt', { method: 'POST', body: { actorId: from.id, token: from.token, targetId: to.id, similarity: 0.6, ...extra } });
+    const cyWs = new WebSocket(`ws://localhost:${PORT}/ws?attendee=${cy.id}`);
+    const cyGot = new Promise((res) => cyWs.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.type === 'haunted') res(m); }));
+    await new Promise((res, rej) => { cyWs.addEventListener('open', res); cyWs.addEventListener('error', rej); });
+    check((await haunt(cy, dee)).status === 200, 'haunt back setup: Cy haunts Dee');
+    const hb = await haunt(dee, cy, { similarity: null, back: true });
+    check(hb.status === 200 && hb.data.card?.name === 'Cy', 'haunt back after being haunted -> 200 with the card');
+    const backPush = await Promise.race([cyGot, new Promise((r) => setTimeout(() => r(null), 3000))]);
+    check(backPush?.back === true && backPush.by?.name === 'Dee', 'haunted-back phone gets haunted with back:true and the right by.name');
+    check((await haunt(dee, cy, { back: true })).status === 429, 'haunt back keeps the 60 s cooldown');
+    check((await haunt(eve, cy, { back: true })).status === 400, 'haunt back toward someone who never haunted you -> 400');
+    const evs = (await json('/api/events?limit=50')).data.events || [];
+    const pair = (from, to) => evs.find((e) => e.type === 'haunt' && e.actorId === from.id && e.targetId === to.id);
+    check(pair(dee, cy)?.back === true && pair(cy, dee) && !('back' in pair(cy, dee)), 'haunt back stored as type haunt with back:true; a plain haunt has no back');
+    cyWs.close();
+  }
   ws.close();
 } catch (e) { fails.push('exception: ' + (e.stack || e)); }
 finally { server.kill(); }
