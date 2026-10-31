@@ -6,13 +6,15 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deployInfo } from '../server/version.js';
+import net from 'node:net';
+import { randomBytes } from 'node:crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
 const MIRROR = 'https://mirror.test'; // stands in for the Base44 mirror's origin (FRONTEND_ORIGINS)
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1', SCOUT_SWEEP_MS: '400', SCOUT_MIN_N: '2' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1', SCOUT_SWEEP_MS: '400', SCOUT_MIN_N: '2', PRESENCE_GRACE_MS: '300', PRESENCE_HEARTBEAT_MS: '300' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
@@ -26,7 +28,7 @@ try {
   for (let i = 0; i < 100 && !up; i++) { try { up = (await fetch(BASE + '/api/gallery')).ok; } catch {} if (!up) await new Promise((r) => setTimeout(r, 200)); }
   check(up, 'server did not boot: ' + serverLog);
 
-  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/admin', '/face.js', '/common.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
+  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/admin', '/face.js', '/common.js', '/presence.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
     const r = await fetch(BASE + p); check(r.ok, `GET ${p} -> ${r.status}`);
   }
   for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate']) { // a repeated id makes $('x') grab the wrong element
@@ -149,6 +151,38 @@ try {
     const pair = (from, to) => evs.find((e) => e.type === 'haunt' && e.actorId === from.id && e.targetId === to.id);
     check(pair(dee, cy)?.back === true && pair(cy, dee) && !('back' in pair(cy, dee)), 'haunt back stored as type haunt with back:true; a plain haunt has no back');
     cyWs.close();
+  }
+  { // presence (#33): an open phone page (/ws?attendee=<id>) makes that person online; every socket gets presence {online, findable}
+    // on connect and on each change; closing the page takes them offline after the grace; the heartbeat drops a phone that stops
+    // answering pings; someone not findable is never counted or listed, even with a page open
+    const watcher = new WebSocket(`ws://localhost:${PORT}/ws`), inbox = [];
+    watcher.addEventListener('message', (e) => inbox.push(JSON.parse(e.data)));
+    const opened = (s) => new Promise((res, rej) => { s.addEventListener('open', res); s.addEventListener('error', rej); });
+    await opened(watcher);
+    const presence = async (pred, ms = 2500) => { for (const t = Date.now(); Date.now() - t < ms; await new Promise((r) => setTimeout(r, 10))) { const i = inbox.findIndex((m) => m.type === 'presence' && pred(m)); if (i >= 0) return inbox.splice(i, 1)[0]; } return null; };
+    const after = async (action, pred, ms) => { inbox.length = 0; await action(); return presence(pred, ms); }; // only pushes caused by the action
+    const p0 = await presence(() => true);
+    check(p0 && Array.isArray(p0.online) && p0.findable === (await json('/api/gallery')).data.length, 'presence: a new socket gets presence {online, findable} at once; findable = the gallery');
+    let fi;
+    const p1 = await after(async () => { fi = (await json('/api/attendee', { method: 'POST', body: { name: 'Fi', handle: 'fi', consent: true, descriptors: [vec()], avatar: 'data:image/jpeg;base64,AAAA' } })).data; }, (m) => m.findable === p0.findable + 1);
+    check(p1 && !p1.online.includes(fi.id), 'presence: a join pushes the new findable count; not online until a phone page opens');
+    const phone = new WebSocket(`ws://localhost:${PORT}/ws?attendee=${fi.id}`);
+    check(await after(() => opened(phone), (m) => m.online.includes(fi.id)), 'presence: opening a phone page pushes them online');
+    const list = (await json('/api/presence')).data, row = list.people?.find((p) => p.id === fi.id);
+    check(list.online?.includes(fi.id) && row?.online === true && row.name === 'Fi' && row.handle === 'fi' && row.avatar === 'data:image/jpeg;base64,AAAA' && list.people.length === list.findable, 'presence: GET /api/presence lists every findable person with an online flag');
+    check(list.people.every((p) => !('token' in p) && !('descriptors' in p)) && list.people[0].online, 'presence: the list has no tokens or descriptors, online people first');
+    check(await after(() => phone.close(), (m) => !m.online.includes(fi.id)), 'presence: closing the page takes them offline after the grace');
+    // a locked phone or a dropped network never closes its socket: the heartbeat drops it once it misses a pong
+    const dead = net.connect(PORT, '127.0.0.1'), deadClosed = new Promise((res) => dead.on('close', () => res(true)));
+    dead.on('data', () => {}); dead.on('error', () => {}); // reads frames, never answers a ping
+    const deadOn = await after(() => dead.write(`GET /ws?attendee=${fi.id} HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\nSec-WebSocket-Version: 13\r\n\r\n`), (m) => m.online.includes(fi.id));
+    const deadOff = deadOn && await presence((m) => !m.online.includes(fi.id), 5000);
+    check(deadOn && deadOff && await Promise.race([deadClosed, new Promise((r) => setTimeout(() => r(false), 1000))]), 'presence: the heartbeat drops a socket that stops answering pings');
+    const phone2 = new WebSocket(`ws://localhost:${PORT}/ws?attendee=${fi.id}`);
+    await after(() => opened(phone2), (m) => m.online.includes(fi.id));
+    const p5 = await after(() => json(`/api/attendee/${fi.id}`, { method: 'PATCH', body: { token: fi.token, consent: false } }), (m) => m.findable === p0.findable);
+    check(p5 && !p5.online.includes(fi.id) && !(await json('/api/presence')).data.people.some((p) => p.id === fi.id), 'presence: opting out leaves the count and the list at once, page open or not');
+    phone2.close(); watcher.close(); dead.destroy();
   }
   { // costumes (#22): optional short id, served in the gallery (hunters draw it on the matched face) and on the card; 'plain' or junk clears it
     const reg = async (name, costume) => (await json('/api/attendee', { method: 'POST', body: { name, consent: true, descriptors: [vec()], costume } })).data;

@@ -33,6 +33,7 @@ export function connectWs(params, onMessage) {
   const open = () => {
     ws = new WebSocket(url);
     ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'admin_message') toast(`<b>Organizer:</b> ${esc(m.text)}`, 12000); else if (m.type === 'admin_status' && m.blocked) toast('An organizer has paused your access.', 12000); onMessage(m); } catch {} };
+    ws.addEventListener('message', (e) => { try { dispatchEvent(new CustomEvent('haunt:ws', { detail: JSON.parse(e.data) })); } catch {} }); // any module can listen to the page's one socket (web/presence.js)
     ws.onopen = () => { delay = 500; };
     ws.onclose = () => { if (!closed) setTimeout(open, delay = Math.min(delay * 2, 8000)); };
   };

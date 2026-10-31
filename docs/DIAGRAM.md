@@ -88,8 +88,8 @@ flowchart LR
   gh["GitHub release facex-engine/facex v1.0.0<br/>edgeface_xs_fp32.bin, det_500m_int8.bin"]
   gh -. "ensureWeights() on first start" .-> stat
 
-  wsrv -. "push: hello, gallery_changed, attendee_changed, attendee_gone, haunted, state {scout}" .-> common
-  wsrv -. "push: hello, gallery_changed, attendee_gone, joined, event, scout" .-> screen
+  wsrv -. "push: hello, gallery_changed, attendee_changed, attendee_gone, presence, haunted, state {scout}" .-> common
+  wsrv -. "push: hello, gallery_changed, attendee_gone, presence, joined, event, scout" .-> screen
 
   style engine stroke:#7CFF6B,stroke-width:3px,stroke-dasharray:6 4
   style phones stroke:#7CFF6B,stroke-width:2px
@@ -233,6 +233,7 @@ from `web/` with the `.html` extension implied, so `/hunt` serves `web/hunt.html
 | PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` | public card | Profile edits and the kill switch. Pushes `attendee_changed {attendee}` to every socket, or `attendee_gone {id}` when the person is not findable; turning consent back on broadcasts `gallery_changed` instead. A changed `handle` starts a GitHub lookup that pushes the card again when it lands. "Forget me" on `/me` sends `consent: false` then clears local storage. |
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity}` | `{ok: true, card}` | 403 bad token, 404 target missing or hidden, 400 self-haunt. No rate limit: a repeat haunt on the same person is accepted like the first. Writes the event, pushes `haunted` to the target and `event` to screens. |
 | GET | `/api/events` | `?limit=` (default 50, max 500) | `{events[], attendees[]}` | Newest first, each with actor and target cards, plus the consenting attendee cards. Bootstraps `/screen`. |
+| GET | `/api/presence` | none | `{online[], findable, people[]}` | `online`: ids of findable people with `/hunt` or `/me` open (a haunt shrieks on their phone). `people`: every findable person `{id, name, handle, avatar, costume, online}`, online first. No tokens or descriptors. |
 | WS | `/ws` | `?attendee=<id>` and/or `?screen=1` | server to client only | Client messages are ignored. See the table below. |
 
 ## 5. WebSocket messages
@@ -250,3 +251,4 @@ registered; `/screen` connects with `screen=1`.
 | `haunted` | every socket of the target attendee | accepted `POST /api/haunt` | `{by: actor card, at}` | `hauntedAlert()`: shriek, vibrate, flash, toast; `/me` re-renders |
 | `joined` | screens | `POST /api/attendee` | `{attendee: card}` | `/screen` reloads `/api/events` |
 | `event` | screens | accepted `POST /api/haunt` | `{event: {..., actor, target}}` | `/screen` prepends it to the feed and recounts |
+| `presence` | the socket that just connected, then every open socket | connection; a phone page opening, or its last one closing (after a 4 s grace) or missing a heartbeat pong; a join, opt-out or admin block (any `save()`). At most one per 250 ms, only on a change | `{online: [ids], findable: n}`, findable people only | `web/presence.js` (common.js re-fires every message as a `haunt:ws` window event): the header chip on `/hunt`, `/me` and home redraws "N online / M registered" and an open who's-online list moves people between its two sections; `/hunt` redraws an open card's online line; `/screen` redraws online now and the row of online faces |

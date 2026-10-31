@@ -50,6 +50,11 @@ Design goals for a 4-hour build:
 | `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face: the WebGL lens (`web/lens.js`, see 1.2) when it loads, else flat 2D costumes (`web/costume.js`, from the recognition mesh) |
 | `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
+Every main page (`/hunt`, `/me`, home) carries the presence chip in its header (`web/presence.js`, #33):
+"● N online / M registered", always visible; a tap opens the list of who is online (a haunt
+makes their phone shriek) and who is registered but not online. The `/hunt` card says which of
+the two the matched person is.
+
 Two origins, one room. Fly serves the pages and the API together (https://aura-haunt.fly.dev). The Base44 mirror
 (https://aura-haunt.base44.app, built by `scripts/base44.mjs`) serves the same `web/` pages from Base44 hosting with
 `window.HAUNT_API` = the Fly URL, so its phones call the Fly API and socket and meet the Fly phones in one gallery.
@@ -143,7 +148,8 @@ then do leave the phone, so the consent screen must say so if this path is taken
 ### 1.4 Big screen (`/screen`)
 
 Same server, a route meant for a TV. Subscribes to the broadcast socket, shows:
-live event feed ("Matthew haunted Sam"), most-haunted, most-connected, headcount.
+live event feed ("Matthew haunted Sam"), most-haunted, most-connected, headcount
+(registered, online now, and the faces of who is online).
 The room scan (Gaussian splat) plugs in here later; it is not part of the core.
 
 ## 2. Data model
@@ -199,10 +205,11 @@ whenever their socket reconnects).
 | POST | `/api/rating` | `{raterId, token, hauntId, verdict: 'yes' \| 'no' \| 'knew', source?: 'phone' \| 'asi1'}` -> `{ok, scout, reason, changed}`. The Scout's one question after any haunt, from either side: "Would you build something with them?" Stored on that haunt event as `meta.ratings[raterId]` (a second answer overwrites). `knew` is kept but never counted. 403 bad token, 404 a haunt you were not part of, 400 any other verdict. `scout` says whether the Scout arranged that haunt, `reason` why ("Paired on: complement, intent match") or that it was not the Scout's call, `changed` is a changelog entry when this rating tripped a weight change (server/scout.js) |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees, scout}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen`; `scout` is the Scout state block (same shape as the `scout` socket message) |
+| GET | `/api/presence` | `{online, findable, people}`: `online` = ids of findable people with a phone page open right now (a haunt makes that phone shriek), `findable` = how many are registered and findable, `people` = every findable person `{id, name, handle, avatar, costume, online}`, online first, then by name. No tokens, no descriptors. Live updates come as the `presence` push |
 | GET | `/api/version` | `{version, deploy, deployedAt, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`); `deploy` = the deploy number, one more on every deploy (a new Fly image, `FLY_IMAGE_REF`; off Fly a new `APP_VERSION`), kept with `deployedAt` (ms, when that deploy first booted) in `data/version.json`, both `null` on a dev build; boot time; counts. The home page footer shows `v<deploy> · <version> · deployed <time>`. Used by deploy and integrator checks |
 | GET | `/admin` | Admin page; asks for the token, calls the routes below |
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
-| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
+| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `presence {online, findable}` (on every connect, then whenever who is online or the findable count changes; see Presence below), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
 | WS | the Scout, same sockets | phone: `state {scout: {phase: 'clue', matchId, clue, deadline, round}}` when the Scout pairs you with someone (the clue describes the other person from profile and public GitHub, never a name, handle or photo), `state {scout: {phase: 'found', matchId, hauntId, reason}}` when a haunt between the pair lands. Screen: `scout {version, changedAt, weights, predicted {yes, no, n}, baseline {yes, no, n}, clues {sent, found, pending, expired}, changelog[], minN, ratedPairs, nextReviewAt}` on every clue, confirmation, rating and version change |
 
 Every `/api` route answers CORS for the `FRONTEND_ORIGINS` origins (preflight 204, methods GET POST PATCH DELETE,
@@ -214,6 +221,16 @@ re-arms only after the card closes and that person is found again. A closed card
 (Close, or 3.5 s after a sent haunt) stays closed while that person is still in
 frame; it re-arms once they have been out of frame for 2.5 s, or when the hunter
 taps the camera. An open card stays on its person until they leave the frame.
+
+Presence (#33, `server/presence.js`): someone is **online** while a page that plays the
+shriek (`/hunt` or `/me`) holds `/ws?attendee=<id>` open on their phone, so a haunt reaches
+them live. Everyone findable is still recognised by `/hunt` when offline, and a haunt on them
+is saved to their card, without the shriek. Only findable people (opted in, not blocked) are
+counted or listed; "registered" in the UI means this findable count. The server pings every
+socket every 15 s (`PRESENCE_HEARTBEAT_MS`) and drops one that missed its pong, which is how a
+locked phone or a lost network goes offline; a 4 s grace after a page's last socket closes
+(`PRESENCE_GRACE_MS`) keeps a reload, or the hop from `/hunt` to `/me`, from flickering. A
+`presence` push goes out at most every 250 ms, and only when the online set or the count changed.
 
 ## 4. Flows
 
