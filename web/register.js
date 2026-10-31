@@ -61,7 +61,7 @@ $('submit').onclick = async () => {
 if (getMe()) status('You are already registered on this phone. Registering again creates a new card.');
 
 // Optional sign-in (buttons appear only when the server has provider credentials); a session pre-fills the form
-// and offers the profile photo as one face sample.
+// and its profile photo becomes the face signature, so selfies are optional.
 (async () => {
   try {
     const providers = await api('/api/auth/providers');
@@ -79,11 +79,23 @@ if (getMe()) status('You are already registered on this phone. Registering again
       if (!$('name').value) $('name').value = session.name || '';
       if (!$('handle').value) $('handle').value = session.handle || '';
       refresh();
-      if (session.avatar) {
-        const b = document.createElement('button'); b.className = 'secondary'; b.textContent = 'Use my profile photo as a face sample';
-        b.onclick = async () => { b.disabled = true; const img = new Image(); img.src = session.avatar; await img.decode(); await addSample(img, 'profile photo'); };
-        $('auth-buttons').appendChild(b);
-      }
+      if (session.avatar) await useProfilePhoto(session.avatar, labels[session.provider] || 'profile');
     }
   } catch {}
 })();
+
+// Sign-in photos are small (LinkedIn sends 100x100), so draw them at 400 px or more before detecting; the face then
+// clears addSample's 60 px minimum. With a face found, selfies become optional; without one, the selfie flow is unchanged.
+async function useProfilePhoto(src, from) {
+  const img = new Image(); img.src = src; await img.decode();
+  const k = Math.max(1, 400 / Math.min(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, c.width, c.height);
+  const had = descriptors.length;
+  await addSample(c, `your ${from} photo`);
+  if (descriptors.length === had) { status(`No clear face in your ${from} photo. Take a selfie below instead.`); return; }
+  const heading = $('wrap')?.closest('.panel')?.querySelector('h2');
+  if (heading) heading.textContent = `Face signature: your ${from} photo`;
+  $('start').textContent = 'Add a selfie too (optional)';
+  status(`Using your ${from} photo as your face signature, no selfie needed. A selfie or two helps phones match you in a dark room.`);
+}
