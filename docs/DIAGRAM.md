@@ -29,7 +29,7 @@ flowchart LR
     idx["/ index<br/>buttons + QR to /register"]
     reg["/register<br/>name, handle, blurb, consent<br/>3 selfies or photo files"]
     hunt["/hunt<br/>rear camera 640x480, loop every 120 ms<br/>3-vote debounce, card sheet, Haunt button"]
-    me["/me<br/>my card, haunts received and given<br/>consent toggle, forget me, arm sound"]
+    me["/me<br/>my card, haunts received and given<br/>consent toggle, forget me, sound on (first tap arms it)"]
     enroll["/enroll (organizer)<br/>CSV + photos, bulk register"]
     calib["/calibrate (organizer)<br/>pairwise similarity matrix"]
     common["common.js<br/>localStorage haunt.me = id, token, name<br/>api(), connectWs() with backoff<br/>unlockAudio(), shriek(), flash(), toast()"]
