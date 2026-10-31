@@ -56,43 +56,51 @@ HTTPS (camera, mic, and motion sensors are all gated on both).
 
 ### 1.2 Face engine (in the browser)
 
-Library: `@vladmandic/human` v3.3.6 (MIT, TensorFlow.js). One script tag gives
-face detection (BlazeFace), alignment (FaceMesh) and a 1024-float descriptor
-(FaceRes), about 9 MB of weights, plus `human.match.find(descriptor, gallery)`.
-Run it on the **wasm backend**: WebGL on iPhone is float16 and degrades
-descriptors, and the WebGPU backend has an open 90-degree video rotation bug on
-iOS 26. Alternative if accuracy disappoints: FaceX (Apache-2.0, ArcFace-style
-512-d via onnxruntime-web). See RESEARCH.md section D.
+Implemented in `web/face.js` as a switchable engine; everything runs on the phone.
 
-Pipeline per video frame (throttle to 3 to 5 fps; more than ~8 inferences/s
-thermally throttles iPhones):
+**Default: `facex` hybrid.** Human (`@vladmandic/human` 3.3.6, MIT) does detection
+(BlazeFace) and 468-point FaceMesh landmarks on the TensorFlow.js **wasm** backend.
+From the mesh we take the five ArcFace keypoints (eye centers, nose tip, mouth
+corners), warp the face to a 112x112 ArcFace-aligned crop with a canvas similarity
+transform (`alignToArcFace`), and feed it to FaceX's EdgeFace-XS wasm embedder
+(Apache-2.0, 7 MB, vendored in `web/vendor/facex/`), which returns a 512-float
+vector. Matching is cosine similarity. FaceX's own detector is not used: its weight
+file is unpublished, and its bundled align.js produced shifted crops.
 
-1. `human.detect(video)` at ~320 px input -> faces with box + descriptor. Skip
-   faces whose box is under ~80 px or whose frame is blurry (Laplacian variance).
-2. For each face: `match.find` against the gallery (cosine similarity).
-3. Three-zone decision, borrowed from lazo: similarity >= 0.5 is a match,
-   0.4 to 0.5 abstains (draw the box, no name), below 0.4 is discarded.
-4. A match must hold for **3 consecutive frames** before the card appears, which
-   kills flicker and false positives.
+**Fallback: `human`** (`?engine=human`): Human's FaceRes 1024-float descriptor with
+Human's distance-based similarity. Weaker separation, kept for comparison.
 
-Enrollment: **3 selfies** at registration, descriptors averaged into one
-normalized centroid, plus one descriptor from the profile photo. Store both and
-take the max similarity. The live selfie taken in the room's lighting is the one
-that actually matches; profile photos are often old or filtered.
+Measured on 14 real photos from Human's sample set (same people years apart,
+strangers), see RESEARCH.md section D:
 
-Tune the threshold on the team's faces in the real room before the demo. Prefer
-false negatives over false positives: a wrong name on a stranger is the worst
-outcome. Backlit windows and stage lights are the main failure mode; enable
-Human's `filter.equalization`.
+| engine | same-person similarity | highest stranger pair |
+|---|---|---|
+| facex (default) | 0.47 to 0.79 (one 11-years-apart pair at 0.36) | 0.36 |
+| human | 0.28 to 0.51 | 0.44 (overlaps) |
 
-Model loading: ~9 MB. Load on `/register` while the user reads the consent
-text, rely on the HTTP cache, show a progress bar, and do not open the camera
-until models are warm.
+Thresholds (`THRESHOLD` in face.js, override with `?t=`): facex **0.4**, human 0.5.
+Below `THRESHOLD - 0.1` a face is drawn as "unknown"; in between it is drawn as
+"?" with no name (abstain band). A match must hold for **3 consecutive frames**
+before the card appears. Same-session selfies in the same light will score higher
+than these cross-year photos, so tune the threshold on the team's faces in the
+room with `/calibrate` before the demo. Prefer false negatives over false
+positives: a wrong name on a stranger is the worst outcome.
+
+Enrollment: 3 selfies (or photos) at registration; every descriptor is stored and
+the best one wins at match time. The live selfie taken in the room's lighting is
+the one that actually matches; profile photos are often old or filtered.
+
+Per video frame on `/hunt` (throttled to roughly 3 to 5 fps; more than ~8
+inferences/s thermally throttles iPhones): detect -> landmarks -> align -> embed ->
+cosine against the gallery -> vote.
+
+Model loading: ~9 MB Human + 7 MB FaceX, from jsDelivr and our own origin, HTTP
+cached after the first visit. Load while the user reads the consent text; do not
+open the camera until models are warm.
 
 Server-side fallback if phones are too slow: DeepFace in Docker (MIT, `/register`
-and `/search` REST endpoints, ~5 minutes to stand up on an amd64 host); the
-phone posts one JPEG every ~500 ms. Faces then do leave the phone, so say so on
-the consent screen if this path is taken.
+and `/search` REST endpoints); the phone would post one JPEG every ~500 ms. Faces
+then do leave the phone, so the consent screen must say so if this path is taken.
 
 ### 1.3 Server (Node, one process)
 
@@ -209,7 +217,7 @@ every phone within one refresh.
 | Dim party lighting, no match | Live selfie taken in the same room; lower threshold only after testing; QR on badge as fallback identity |
 | iOS kills camera when tab backgrounds | Re-acquire stream on `visibilitychange`; show a "tap to resume" overlay. Only one active getUserMedia at a time; `<video autoplay muted playsinline>` is mandatory; `facingMode: 'environment'` may pick the ultra-wide lens, so prefer the device labelled "Back Camera" |
 | Audio does not play on the haunted phone | Unlock Web Audio with a silent buffer on the register tap; keep the page open (no Web Push in the core) |
-| Phone too slow for the model | Downscale video to 320 px for detection; detect every Nth frame; fall back to a server-side match endpoint (one JPEG frame) if research finds a quick OSS service |
+| Phone too slow for the model | Lower video resolution; detect every Nth frame; `?engine=human` skips the second model; last resort is the DeepFace server-side path |
 | Two attendees look alike / twins | Show top-2 when the margin between them is < 0.05 and let the hunter pick |
 | OAuth provider slow to approve | `manual` provider: name + handle + selfie, no login. Keep this path regardless; it is also the fastest at the door |
 

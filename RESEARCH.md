@@ -203,6 +203,13 @@ https://bugs.webkit.org/show_bug.cgi?id=301627 , https://howaiworks.ai/blog/tran
 - If using onnxruntime-web: load `ort.wasm.min.js` (not `ort.min.js`, which balloons memory in WebKit), `numThreads = 1` without COOP/COEP. Sustained >8 inferences/s thermally throttles; run detection at 3 to 5 fps and embed only when a face is stable.
 - Thresholds: Human similarity ≥ 0.5 (abstain band 0.4 to 0.5); ArcFace-family cosine 0.40 to 0.45. Enrol 3 to 5 selfies, store the normalized centroid, min face box ~80 px, reject blurry frames, vote over 3 consecutive frames. Backlit windows and stage spots are the main failure mode; enable Human's `filter.equalization`.
 
+### What actually happened when we built it (2026-10-31)
+
+- Human FaceRes on 14 real sample photos: same-person 0.28 to 0.51, strangers up to 0.44 (overlap). `faceres-deep` compressed everything upward (strangers to 0.79). Input equalization changed nothing.
+- FaceX: no npm package; the SDK is vendored from `wasm/`. Its detector needs `yunet_fp32.bin`, which is not published anywhere (release ships `det_500m_int8.bin`, which the vendored detect.wasm rejects with "bad magic"). Its SIMD probe bytes were malformed (fixed in our copy). Its `align.js` produced shifted crops.
+- Working combination: Human detector + FaceMesh keypoints -> our own canvas similarity-transform alignment -> FaceX EdgeFace-XS embedder. Same-person 0.47 to 0.79 (one 11-year pair 0.36), strangers <= 0.36, threshold 0.4. This is the default engine.
+- Calibration page `/calibrate` shows the pairwise matrix; Playwright scripts for the matrix and the end-to-end flow live in the main session's scratchpad (not in the repo).
+
 ### Use this
 
 **@vladmandic/human**, wasm backend, ~320 px input, 3 to 5 fps. Enrol with 3 selfies -> centroid 1024-d vector stored with the profile. Ship all opt-in embeddings to `/hunt` as one JSON; match client-side at ≥ 0.5 with 3-frame voting and lazo's abstain band. Keep **DeepFace Docker** as the 20-minute fallback (POST a JPEG every ~500 ms, match server-side).
