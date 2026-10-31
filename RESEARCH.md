@@ -95,3 +95,75 @@ Next.js (or Vite) pages + Auth.js (LinkedIn OIDC + GitHub, store picture bytes) 
 ### Use this / skip
 
 Do: Scaniverse scan during setup, Spark on the big screen, AR.js or MindAR sigils with QR fallback, compass effect. Skip: 8th Wall, Polycam, GaussianSplats3D, Zappar, ultrasound. ggwave throw is a stretch demo.
+
+---
+
+## C. Agents and models inside HAUNT
+
+### Hard constraint first
+
+Anthropic's usage policy prohibits using Claude for facial recognition and for
+collecting biometric data. So: **never send a face to Claude (or any hosted LLM)
+to ask "who is this."** Face ID stays on the open-source, on-device Human library
+exactly as in ARCHITECTURE.md. Claude is fine for narration, matchmaking, card
+enrichment, and describing scenes or costumes without identifying people. The
+"Demogorgon" agent localizes photos against the room (**where**, not who).
+Verify the current wording on anthropic.com before the pitch.
+https://conductatlas.com/platform/anthropic/anthropic-api-usage-policy/biometric-and-neural-data-prohibition/
+
+### What "jev" is
+
+Jev = TypeSafe AI's "System One" decision model (launched 2026-09-15). Returns
+typed decisions only (choice, score, yes/no probability) in 70 to 500 ms, no
+text. Waitlist-gated at typesafe.ai. Would suit fast game logic (role assignment,
+"should the narrator interrupt now") but only if someone already has access;
+otherwise a Claude Haiku 5.5 call with structured output does the same in under a
+second. https://www.blogdumoderateur.com/jev-modele-ia/ ,
+https://pub.towardsai.net/jev-the-ai-model-that-doesnt-write-it-decides-6f3d91a78c3a
+Effort S, payoff low-med.
+
+### Agent roles in the game
+
+| Agent | What | Stack | Effort / payoff |
+|---|---|---|---|
+| **Narrator / game master** | Server loop batches the event feed every 20 to 30 s, asks Claude for a two-line spooky announcement, pipes to ElevenLabs TTS, plays on the big screen | Anthropic Messages API, `claude-opus-5-5`, low effort setting, streaming, prompt caching on system prompt + lore | S / high. Most visible agent in the demo |
+| **Matchmaker "who should I meet"** | Tool-use agent with `list_attendees(opted_in)` and `github_activity(handle)` | SDK Tool Runner (`client.beta.messages.tool_runner`), wrapped in a Fetch.ai uAgent with the Chat Protocol + Mailbox so it is discoverable in ASI:One. `create-fetch-agent` scaffolds it. https://uagents.fetch.ai/docs/getting-started/chatprotocol , https://uagents.fetch.ai/docs/examples/asi-1 , https://innovationlab.fetch.ai/resources/docs/create-fetch-agent/overview | S / high. Budget 45 to 60 min for Fetch registration. **Fetch.ai track** |
+| **Card enrichment** | One Claude call at registration summarizes GitHub Events into "what they're building this week" | Messages API; Batch API if pre-enriching a known list | S / med |
+| **Demogorgon** (photo-to-zone localizer that improves) | Attendees upload a photo of their surroundings; Claude vision picks which zone/sigil it was taken from, given reference photos per zone. Run 1 zero-shot. After the room plays, a memory file of confirmed photo-to-zone pairs + confusion table makes run 2 beat run 1 on a fixed 20-photo held-out set | `claude-opus-5-5` vision; host on TrueForge (`npx @truefoundry/trueforge@latest`), whose session traces are the run log. https://www.truefoundry.com/docs/agent-platform/agent-harness/overview , https://www.truefoundry.com/blog/trueforge-agent-events-runtime-contract . Note: TrueFoundry's older agent APIs were cut over 2026-10-15; use TrueForge endpoints only | M / high. **TrueForge track**, stays inside the no-face-ID policy |
+
+Framework: Anthropic SDK + Tool Runner for all of these. Skip LangGraph and MCP
+for a 4-hour build. Vercel AI SDK only if the frontend is Next.js and you want
+streaming UI helpers.
+
+### Realtime voice (a spooky voice you can talk to)
+
+- **ElevenLabs Agents** — build in dashboard, paste the embed widget into `/me`. Free tier ~15 min of calls, 4 concurrent. Fine for a demo, not a room. https://elevenlabs.io/pricing/agents . Effort S.
+- **LiveKit Agents** — Apache-2.0, WebRTC bundled, OpenAI Realtime backend. More wiring. https://livekit.io/field-guides/guide/livekit-vs-pipecat . Effort M. Pipecat is lower-level still.
+- Anthropic has no realtime speech-to-speech endpoint; Claude is the brain behind STT/TTS if going the LiveKit route.
+- Cheapest with a real room: narrator TTS only, one-way.
+
+### Vision beyond face ID
+
+Claude vision (1 to 3 s per image) for "describe the costume / scene / where was
+this taken": theming and the Demogorgon only. Gemini similar. Moondream
+on-device: no reliable iPhone-browser evidence, skip. Nothing here helps face
+matching; the core stays Human on-device.
+
+### On-device / browser models
+
+WebGPU shipped by default in Safari 26 (iOS 26) but a WebKit bug still breaks
+some engines on 26.2; treat WebGPU as a bonus. Transformers.js v4 falls back to
+WASM. WebLLM is WebGPU-only and only 360M to 1B models are realistic on phones.
+Verdict: Human on WebGL for faces, no browser LLM.
+https://bugs.webkit.org/show_bug.cgi?id=301627 , https://howaiworks.ai/blog/transformers-js-v4-release.md
+
+### How agents feed the sponsor tracks
+
+- **Shelled:** have Shelled's agents build the narrator and matchmaker. They cannot hear TTS, judge "spooky", test the Fetch mailbox handshake, or tune the on-device face threshold. Each is an EDGE_CASES.md entry with a role attribution (Tester approving un-hearable audio, Reviewer passing a prompt that produced flat narration).
+- **TrueForge:** the Demogorgon's memory file is the self-improvement artifact; report accuracy run 1 vs run 2 on the held-out set. Softer second metric: haunts per minute after each narrator announcement.
+
+### Top 3
+
+1. Narrator with TTS on the big screen (S, high, pure Messages API).
+2. Matchmaker on Agentverse (S, high, Fetch.ai track).
+3. Demogorgon photo-to-zone localizer with memory on TrueForge (M, high, TrueForge track).

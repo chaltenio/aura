@@ -183,6 +183,10 @@ every phone within one refresh.
 - Matching only runs against people who opted in; everyone else is drawn as an
   anonymous box, never named, never stored.
 - One-tap kill switch, and it works immediately.
+- No face ever goes to a hosted LLM. Anthropic's usage policy prohibits facial
+  recognition and biometric collection with Claude, so identification is only
+  ever the open-source on-device library. Hosted models get events, profiles,
+  and room photos (where, not who).
 
 ## 6. Failure modes and what to do
 
