@@ -9,24 +9,24 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - `web/vendor/facex/` vendored FaceX SDK; weights (`*.bin`) are gitignored and fetched on setup.
 - `docs/` TEAMWORK.md (how we work), INTEGRATION_LOG.md (integrator digests). Root: RESEARCH.md, EDGE_CASES.md.
 
-## Git: small, atomic, often
+## Git: own branch, small commits, push often, merge through /merge
+- Every session (human or agent) works on its own branch: `git switch -c <name>/<task>` (e.g. `matt/hunt-votes`, `sam/screen-leaderboard`). Never commit to `main` directly; only the merge resolver (`/merge`) moves `main`.
+- Several sessions on one laptop: one worktree each. `git worktree add ../aura-<task> -b <name>/<task>` then `cd ../aura-<task> && npm install && claude`.
 - One logical change per commit. Commit as soon as a step works; never batch an hour of work.
 - Message style: `area: what changed` (e.g. `hunt: 3-frame vote before showing card`). Body only if the why is not obvious.
-- Stage explicitly (`git add <paths>`), never `git add -A`; teammates have uncommitted work in the same tree.
-- Direct to `main`, no feature branches, for this hackathon. Branch only for a risky spike you may throw away.
-- Before every push: `scripts/sync.sh` (= `git pull --rebase`, run `npm test` if present, `git push`). Pull-rebase first, always.
-- Push after every atomic commit with `scripts/sync.sh`. Unpushed work is invisible to the team and the integrator.
-- Never let local work sit unpushed for more than 15 minutes or across a context switch. Before leaving the keyboard, push.
-- Never force-push, never rewrite shared history, never commit `data/`, `.env`, weights, or `node_modules`.
-- If `npm test` fails on main, fixing it is the next thing anyone does. Say so in the room.
+- Stage explicitly (`git add <paths>`), never `git add -A`.
+- Push your branch after every atomic commit with `scripts/sync.sh` (it pushes `origin HEAD` on a branch and refuses on `main`). Never let work sit unpushed more than 15 minutes or across a context switch; before leaving the keyboard, push.
+- Ready to land? Run `/merge`. It rebases your branch onto `origin/main`, resolves conflicts keeping both sides' intent, runs the test, fast-forwards `main`, deletes the branch, and posts to the bus. Do not merge by hand.
+- Never force-push a shared branch, never rewrite `main`, never commit `data/`, `.env`, weights, or `node_modules`.
+- If `npm test` fails on `main`, fixing it is the next thing anyone does. Say so on the bus.
 - End commit messages with the Co-Authored-By line when an agent wrote the change.
 
 ## Working in parallel
 - Claim a task in TODO.md (put your name in the Owner column) before starting; tick it when it is on main.
 - One owner per file at a time. Touching someone else's file: tell them first, keep the diff tiny.
-- Agents: one git worktree per task (`EnterWorktree`), rebase onto main before merging, delete when done.
+- Agents: one git worktree and one branch per task (`EnterWorktree` or `git worktree add`), landed with `/merge`, deleted when done.
 - The contract is ARCHITECTURE.md: API paths, payload shapes, event names. Change the doc in the same commit as the code.
-- Integration checkpoint every 30 min: everyone pushes, integrator runs the smoke test, STATUS in TODO.md updated.
+- Integration checkpoint every 30 min: everyone pushes their branch, anyone with a working step runs `/merge`, integrator runs the smoke test on `main`, STATUS in TODO.md updated. A branch older than 45 minutes gets a nudge.
 - Integrator tab: `/loop 5m /integrator` (see `.claude/skills/integrator/SKILL.md`).
 
 ## Talking to the team bus

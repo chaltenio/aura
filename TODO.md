@@ -41,5 +41,5 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 ## Decisions
 
 - Tracks: **Shelled AI** + one of Fetch.ai / TrueForge (max 2 per project). Base44 skipped.
-- Git: direct to `main`, atomic commits, `scripts/sync.sh` before every push, no force-push.
+- Git: one branch per session (`<name>/<task>`), atomic commits, `scripts/sync.sh` after every commit, land with `/merge`. Nobody commits to `main` by hand. (Replaced direct-to-main at 13:40: parallel sessions were colliding on the same files.)
 - Face matching is on-device only. No face image or embedding reaches a hosted model.
