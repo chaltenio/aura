@@ -42,6 +42,8 @@ Fetch.ai fit: the scout is a uAgent on Agentverse with a mailbox so "Who should 
 
 Dropped on purpose (good ideas, not for today): one agent per person, agent-to-agent negotiation, sender-pays economics, readiness over time, Fetch.ai payments. The scout + mutual gate + one rating question is the whole demo.
 
+Design docs: `docs/scout/README.md` is the reconciled plan; `missed-connections.md`, `collaboration.md`, `calibration.md` are the three explorations behind it.
+
 Touches: new `server/scout.js` (or its own small process), `POST /api/rating`, a `match` event type, a `state` payload for the clue, a small match badge in `web/hunt.js`. Reads `GET /api/gallery` (ids), `GET /api/attendee/:id/card`, `GET /api/events`.
 
 ## 3. Ideas that fit and are free for another teammate to take
