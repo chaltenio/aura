@@ -26,6 +26,8 @@ The app asks for `read:user` only (name, login, avatar). If the app belongs to a
 
 ## LinkedIn
 
+**Live on prod since 2026-10-31:** app `HAUNT` (linkedin.com/developers/apps/264202152, owner Matt; add teammates under Team members), page linkedin.com/company/haunt-hackathon, one redirect URL `https://aura-haunt.fly.dev/auth/linkedin/callback`. Its values are in `secrets/prod.enc.env` and on Fly. For localhost or the tunnel, add that callback to the same app or make a dev app and put it in `dev`.
+
 1. linkedin.com/developers/apps, Create app. It must be associated with a LinkedIn **Company Page** (create an empty one if you have none) and needs a logo.
 2. Products tab: request **Sign In with LinkedIn using OpenID Connect**. This is normally approved immediately.
 3. Auth tab: add the redirect URL `BASE/auth/linkedin/callback`. The Auth tab also shows the Client ID and the Client Secret (Primary).
