@@ -160,14 +160,17 @@ on a `gallery_changed` socket message).
 |---|---|---|
 | GET | `/auth/github`, `/auth/linkedin`, `/auth/google`, `/auth/apple` | OAuth redirect; sets session cookie. A second provider while signed in links to the same session |
 | GET, POST | `/auth/:provider/callback` | Provider return (Apple uses `form_post`, so POST). Redirects to `/register` |
+| POST | `/api/session/logout` | Clears the session cookie |
 | GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` |
-| POST | `/api/attendee` | `{descriptors, consent, blurb, costume?}` -> `{id, token}` (profile comes from session). `costume` is a short lowercase id; anything else (or `'plain'`) stores `null` |
-| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume. 403 on a bad token |
-| GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (`costume` so the hunter can draw it the moment the face matches). Avatars are a separate lazy endpoint |
-| GET | `/api/attendee/:id` | public card: name, handle, avatar, blurb, linkedin, costume, GitHub "this week" summary |
-| POST | `/api/haunt` | `{targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
+| POST | `/api/attendee` | `{name, handle?, blurb?, linkedin?, consent: true, descriptors: [[...]], avatar?, costume?}` -> `{id, token}`. A signed-in session fills provider, name, handle, avatar. 400 unless `consent === true` and every descriptor has at least 128 finite numbers. `costume` is a short lowercase id (`web/costume.js`); anything else, or `'plain'`, stores `null` |
+| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; broadcasts `gallery_changed` |
+| GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (the matching set `/hunt` loads; `costume` so it can draw it the moment a face matches). Cards and avatars come from `/api/attendee/:id` |
+| GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, costume, hauntedCount, huntCount`. 404 if unknown |
+| POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
-| WS | `/ws?attendee=<id>` | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores) |
+| GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
+| GET | `/api/version` | `{version, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`), boot time, counts. Used by deploy and integrator checks |
+| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores) |
 
 Rate-limit haunts per pair (one per 60 s) so a phone pointed at someone does not
 spam them.
