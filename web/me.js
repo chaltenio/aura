@@ -1,4 +1,4 @@
-import { api, getMe, clearMe, connectWs, unlockAudio, hauntedAlert, esc, fmtTime, renderProfile } from '/common.js';
+import { api, getMe, clearMe, connectWs, soundOn, hauntedAlert, esc, fmtTime, renderProfile } from '/common.js';
 const $ = (id) => document.getElementById(id);
 const me = getMe();
 
@@ -55,7 +55,9 @@ if (!me) { $('nocard').hidden = false; } else {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
   $('copy').onclick = async () => say($('copy'), (await copyText(connsText(conns))) ? 'Copied ✓' : 'Copy failed');
   if (navigator.share) { $('share').hidden = false; $('share').onclick = () => navigator.share({ title: 'Tonight at HAUNT', text: connsText(conns) }).catch(() => {}); }
-  $('arm').onclick = () => { unlockAudio(); $('arm').textContent = '🔊 Sound armed. Keep this page open.'; };
+  // sound is on by default: common.js arms it on the first tap anywhere, so this button only gives that tap a home
+  const soundLabel = () => { $('arm').textContent = soundOn() ? '🔊 Sound on. Keep this page open.' : '🔊 Sound on (tap anywhere once to wake it)'; };
+  addEventListener('soundchange', soundLabel); soundLabel();
   $('save').onclick = async () => { $('save').disabled = true; try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, handle: $('ghhandle').value, linkedin: $('linkedin').value } }); await new Promise((r) => setTimeout(r, 1500)); await render(); } finally { $('save').disabled = false; } };
   $('consent').onchange = async (e) => { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: e.target.checked } }); };
   $('forget').onclick = async () => { try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: false } }); } catch {} clearMe(); location.href = '/'; };

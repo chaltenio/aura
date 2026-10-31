@@ -200,8 +200,9 @@ re-arms only after the card closes and that person is found again.
 3. Detect loop at 3 to 5 fps. On match above threshold for 3 consecutive frames
    (debounce), show the card overlay and a "Haunt" button.
 4. Haunt -> POST, target's phone receives `haunted`: plays the shriek (Web Audio,
-   unlocked at registration by a silent play on tap), flashes the screen, shows
-   who found them. Both see each other's card; a `connect` event is written.
+   on by default: unlocked by a silent play on the first tap anywhere on the
+   page), vibrates on Android, flashes the screen, shows who found them. Both see
+   each other's card; a `connect` event is written.
 
 **Opt out**
 
