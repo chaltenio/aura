@@ -23,6 +23,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 26 | UI/UX pass: drive every page in an emulated phone (iPhone + Pixel, fake camera) and fix the clunky parts: register, hunt, screen, calibrate, index, app.css | Matt | [ ] |
 | 28 | Deploy version: the home page footer shows `v<N> · <sha> · deployed <time>`; N goes up by one on every deploy (counter in `data/version.json`, bumped at boot when the deployed image changes); `/api/version` gains `deploy`, `deployedAt` | Matt | [x] |
 | 29 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [x] |
+| 31 | Costume lens: Snapchat-style costumes on `/hunt` (MediaPipe Face Landmarker tracking at camera rate + WebGL face paint lit by the real skin, tracked irises, fangs in the open mouth, 3D props occluded by the head); 2D costumes stay as the fallback | Matt | [ ] |
 
 ## Next
 
