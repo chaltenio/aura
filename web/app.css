@@ -13,6 +13,7 @@ a { color: var(--accent); }
 .panel { background: var(--panel); border-radius: 14px; padding: 14px; margin: 12px 0; }
 label { display:block; margin: 10px 0 4px; color: var(--mute); font-size: 14px; }
 label .opt { font-size: 12px; opacity: .8; margin-left: 4px; }
+h2 .opt { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 13px; margin-left: 6px; }
 input, textarea, select, button { font: inherit; }
 input[type=text], input[type=url], input[type=search], textarea { width:100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background:#0f0e16; color: var(--ink); font-size: 16px; }
 input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px #ff6a0033; }
