@@ -64,7 +64,10 @@ export function flash() {
 }
 export function toast(html, ms = 5000) {
   let el = document.querySelector('.toast');
-  if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
+  if (!el) {
+    el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'alert'); document.body.appendChild(el);
+    el.addEventListener('click', (e) => { if (!e.target.closest('button, a')) el.classList.remove('show'); }); // tap the alert to dismiss it
+  }
   el.innerHTML = html; el.classList.add('show');
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), ms);
 }
@@ -72,9 +75,13 @@ export function hauntedAlert(msg) {
   shriek(); flash();
   const by = msg.by || {}; const name = esc(by.name || 'someone');
   const canBack = !msg.back && by.id && getMe(); // a haunt back gets no button, so it can't ping-pong
-  toast(`<b>${msg.back ? `👻 ${name} haunted you back!` : `👻 You've been haunted by ${name}`}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}${canBack ? '<button class="haunt-back">Haunt back</button>' : ''}`, 12000);
+  const av = by.avatar ? `<img class="t-av" src="${esc(by.avatar)}" alt="">` : ''; // their face: so you can spot who it was in the room
+  toast(`<div class="t-row">${av}<div><b>${msg.back ? `👻 ${name} haunted you back!` : `👻 You've been haunted by ${name}`}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}</div></div>${canBack ? '<button class="haunt-back">Haunt back</button>' : ''}`, 12000);
   const btn = canBack && document.querySelector('.toast .haunt-back');
-  if (btn) btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = await hauntBack(by); });
+  if (btn) btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Haunting…'; btn.textContent = await hauntBack(by);
+    const el = document.querySelector('.toast'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2500);
+  });
 }
 /** Haunt back whoever haunted this phone (`by` = card from the haunted push). Call from a tap. Returns a short status for the UI. */
 export async function hauntBack(by) {
