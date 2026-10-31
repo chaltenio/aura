@@ -11,4 +11,5 @@ function render() {
 }
 async function load() { const d = await api('/api/events?limit=200'); events = d.events; attendees = d.attendees; render(); }
 await load();
-connectWs({ screen: '1' }, (msg) => { if (msg.type === 'event') { events.unshift(msg.event); render(); } if (msg.type === 'joined' || msg.type === 'gallery_changed') load(); });
+// attendee_gone: someone turned findable off, so the headcount drops now (attendee_changed alters nothing shown here)
+connectWs({ screen: '1' }, (msg) => { if (msg.type === 'event') { events.unshift(msg.event); render(); } if (msg.type === 'joined' || msg.type === 'gallery_changed' || msg.type === 'attendee_gone') load(); });

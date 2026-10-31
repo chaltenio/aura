@@ -1,4 +1,4 @@
-import { api, getMe, clearMe, connectWs, soundOn, hauntedAlert, esc, fmtTime, renderProfile } from '/common.js';
+import { api, getMe, clearMe, connectWs, soundOn, hauntedAlert, toast, esc, fmtTime, renderProfile } from '/common.js';
 import { costumePicker } from '/costume.js';
 const $ = (id) => document.getElementById(id);
 const me = getMe();
@@ -32,27 +32,46 @@ const say = (btn, label) => { if (!btn.dataset.label) btn.dataset.label = btn.te
 
 if (!me) { $('nocard').hidden = false; } else {
   $('has').hidden = false;
-  let conns = [];
-  const costume = costumePicker($('costume'), { name: () => $('name').textContent || me.name, onPick: (c) => api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, costume: c } }).catch(() => {}) });
+  let conns = [], lookingUp = false;
+  // edits go out one at a time in the order they were made, so a quick run of costume taps ends on the last one everywhere
+  let queue = Promise.resolve();
+  const patch = (body) => (queue = queue.catch(() => {}).then(() => api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, ...body } })));
+  const costume = costumePicker($('costume'), { name: () => $('name').textContent || me.name, onPick: (c) => patch({ costume: c }).catch(() => toast("Costume not saved. Check your connection and pick it again.")) });
+  // pick: also move the costume chips. Not for a save or a push: the chips on this phone are already ahead of the server.
+  const showCard = (card, pick = true) => {
+    $('name').textContent = card.name; $('handle').textContent = card.handle ? '@' + card.handle : ''; $('blurb').textContent = card.blurb || '';
+    $('stats').textContent = `haunted ${card.hauntedCount}× · hunted ${card.huntCount}×`;
+    if (card.avatar) { $('avatar').src = card.avatar; $('avatar').hidden = false; $('noavatar').hidden = true; }
+    $('consent').checked = card.consent;
+    if (pick) costume.set(card.costume);
+    lookingUp = !!card.profileLoading; // the server pushes the card again when the GitHub lookup lands
+    const looking = lookingUp ? `<div class="mute">Looking up @${esc(card.handle)} on GitHub…</div>` : '';
+    $('profile').innerHTML = looking + (renderProfile(card) || (looking ? '' : '<span class="mute">Add your GitHub handle below to show your profile on your card.</span>'));
+    if (document.activeElement !== $('ghhandle')) $('ghhandle').value = card.handle || '';
+    if (document.activeElement !== $('linkedin')) $('linkedin').value = card.linkedin || '';
+  };
+  const showConns = () => {
+    $('nconn').textContent = `(${conns.length})`;
+    $('connact').hidden = !conns.length;
+    $('conns').innerHTML = conns.map(connRow).join('') || '<li class="mute">Nobody yet. <a href="/hunt">Go hunt</a></li>';
+  };
   const render = async () => {
     try {
       const { me: card, connections = [] } = await api(`/api/me/${me.id}?token=${encodeURIComponent(me.token)}`);
-      $('name').textContent = card.name; $('handle').textContent = card.handle ? '@' + card.handle : ''; $('blurb').textContent = card.blurb || '';
-      $('stats').textContent = `haunted ${card.hauntedCount}× · hunted ${card.huntCount}×`;
-      if (card.avatar) { $('avatar').src = card.avatar; $('avatar').hidden = false; $('noavatar').hidden = true; }
-      $('consent').checked = card.consent;
-      costume.set(card.costume);
-      $('profile').innerHTML = renderProfile(card) || '<span class="mute">Add your GitHub handle below to show your profile on your card.</span>';
-      if (document.activeElement !== $('ghhandle')) $('ghhandle').value = card.handle || '';
-      if (document.activeElement !== $('linkedin')) $('linkedin').value = card.linkedin || '';
-      conns = connections;
-      $('nconn').textContent = `(${connections.length})`;
-      $('connact').hidden = !connections.length;
-      $('conns').innerHTML = connections.map(connRow).join('') || '<li class="mute">Nobody yet. <a href="/hunt">Go hunt</a></li>';
+      showCard(card); conns = connections; showConns();
     } catch (e) { if (e.status === 403) { clearMe(); location.reload(); } }
   };
   render();
-  connectWs({ attendee: me.id }, (msg) => { if (msg.type === 'haunted') { hauntedAlert(msg); render(); } });
+  connectWs({ attendee: me.id }, (msg) => {
+    if (msg.type === 'haunted') { hauntedAlert(msg); render(); }
+    // profile edits arrive the moment they are saved: your own card (the GitHub lookup landing) and the people you met tonight
+    if (msg.type === 'attendee_changed') {
+      const k = msg.attendee, c = conns.find((x) => x.card.id === k.id);
+      if (k.id === me.id) showCard(k, false);
+      if (c) { Object.assign(c.card, k); showConns(); }
+    }
+    if (msg.type === 'attendee_gone' && conns.some((x) => x.card.id === msg.id)) { conns = conns.filter((x) => x.card.id !== msg.id); showConns(); }
+  });
   // back from /hunt (bfcache or tab switch): refresh so the people you just haunted show up
   addEventListener('pageshow', (e) => { if (e.persisted) render(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
@@ -61,7 +80,13 @@ if (!me) { $('nocard').hidden = false; } else {
   // sound is on by default: common.js arms it on the first tap anywhere, so this button only gives that tap a home
   const soundLabel = () => { $('arm').textContent = soundOn() ? '🔊 Sound on. Keep this page open.' : '🔊 Sound on (tap anywhere once to wake it)'; };
   addEventListener('soundchange', soundLabel); soundLabel();
-  $('save').onclick = async () => { $('save').disabled = true; try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, handle: $('ghhandle').value, linkedin: $('linkedin').value } }); await new Promise((r) => setTimeout(r, 1500)); await render(); } finally { $('save').disabled = false; } };
-  $('consent').onchange = async (e) => { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: e.target.checked } }); };
-  $('forget').onclick = async () => { try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: false } }); } catch {} clearMe(); location.href = '/'; };
+  // the card shows the save at once; a new GitHub handle fills in by push (re-read after 8 s in case the socket was down)
+  $('save').onclick = async () => {
+    const b = $('save'); b.disabled = true;
+    try { showCard(await patch({ handle: $('ghhandle').value, linkedin: $('linkedin').value }), false); say(b, 'Saved ✓'); if (lookingUp) setTimeout(() => { if (lookingUp) render(); }, 8000); }
+    catch (e) { say(b, `Not saved (${e.message})`); }
+    finally { b.disabled = false; }
+  };
+  $('consent').onchange = (e) => { const on = e.target.checked; patch({ consent: on }).catch(() => { e.target.checked = !on; toast('Not changed. Check your connection.'); }); };
+  $('forget').onclick = async () => { try { await patch({ consent: false }); } catch {} clearMe(); location.href = '/'; };
 }
