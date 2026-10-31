@@ -239,13 +239,46 @@ export function playSting(id) {
 
 // ---------- /hunt: the layer over the camera ----------
 const STING_GAP_MS = 30_000; // one sting per person per 30 s, however often they walk in and out of frame
-/** A canvas over the camera that draws each recognised person's costume, eased between detections at screen rate.
- *  update(source, results, isConfirmed): results from processFrame; a face gets its costume once isConfirmed(id) says the
- *  card's vote passed, and keeps it while it still matches at or above `threshold`. */
+const LENS = new URLSearchParams(location.search).get('lens') !== '2d'; // ?lens=2d keeps the flat costumes (debugging, old phones)
+/** Costumes over the camera. update(source, results, isConfirmed) takes processFrame's results; a face gets its costume once
+ *  isConfirmed(id) says the card's vote passed, and keeps it while it still matches at or above `threshold`. The WebGL lens
+ *  (web/lens.js: tracked face paint, eyes, mouth, 3D props) draws it when it loads and can track that face; otherwise, and
+ *  for any face the lens is not tracking, the flat 2D costume below draws it. */
 export function costumeLayer(wrap, { threshold = 0 } = {}) {
+  const flat = flatLayer(wrap), active = new Map(), stung = new Map(); // id -> last seen; id -> last sting
+  let lens = null, loading = false, last = null;
+  const loadLens = () => {
+    if (loading || !LENS) return; loading = true;
+    import('/lens.js').then((m) => m.createLens(wrap, { onTracking: (id) => flat.release(id) }))
+      .then((l) => { lens = l; window.__lens = l.debug; if (last) l.update(last.source, last.list); }) // replay the latest frame (a test photo sends only three)
+      .catch((err) => { console.warn('costume lens unavailable, using flat costumes', err); window.__lens = { failed: String(err && err.message || err) }; });
+  };
+  return {
+    update(source, results, isConfirmed = () => true) {
+      try {
+        loadLens(); // first frame: start fetching the lens in the background (cached after the first visit)
+        const now = performance.now(), list = [];
+        for (const r of results) {
+          const a = r.attendee, costume = a && COSTUMES[a.costume];
+          if (!costume || r.similarity < threshold) continue;
+          if (!active.has(a.id) && !isConfirmed(a.id)) continue;
+          if (!active.has(a.id) && now - (stung.get(a.id) ?? -Infinity) > STING_GAP_MS) { stung.set(a.id, now); playSting(a.costume); }
+          active.set(a.id, now); list.push({ id: a.id, costume: a.costume, box: r.box, mesh: r.mesh });
+        }
+        last = { source, list };
+        for (const [id, t] of active) if (now - t > 1500) active.delete(id);
+        if (lens && !lens.dead) { lens.update(source, list); flat.update(source, list.filter((x) => !lens.tracking(x.id))); }
+        else flat.update(source, list);
+      } catch (err) { console.warn('costume update', err); } // a costume bug must never stop matching
+    },
+  };
+}
+
+/** The flat 2D costumes: a canvas over the camera, drawn from the recognition mesh and eased between detections. */
+function flatLayer(wrap) {
   const c = document.createElement('canvas'); c.className = 'costume-layer'; c.setAttribute('aria-hidden', 'true'); c.style.pointerEvents = 'none';
   wrap.appendChild(c);
-  const g = c.getContext('2d'), faces = new Map(), stung = new Map(); // attendeeId -> { costume, cur, target, alpha, until }
+  const g = c.getContext('2d'), faces = new Map(); // attendeeId -> { costume, cur, target, alpha, until }
   let raf = 0, last = 0;
   function tick(now) {
     raf = 0; const dt = last ? Math.min(100, now - last) : 16; last = now;
@@ -261,29 +294,23 @@ export function costumeLayer(wrap, { threshold = 0 } = {}) {
     if (faces.size) raf = requestAnimationFrame(tick); else last = 0;
   }
   return {
-    update(source, results, isConfirmed = () => true) {
-      try { place(source, results, isConfirmed); } catch (err) { console.warn('costume update', err); } // a costume bug must never stop matching
-    },
-  };
-  function place(source, results, isConfirmed) {
-    const sw = source.videoWidth || source.naturalWidth || source.width, sh = source.videoHeight || source.naturalHeight || source.height;
-    if (sw && sh && (c.width !== sw || c.height !== sh)) { c.width = sw; c.height = sh; }
-    const now = performance.now(), still = !source.videoWidth, seen = new Set(); // a test photo keeps its costume until the next frame
-    for (const r of results) {
-      const a = r.attendee, costume = a && COSTUMES[a.costume];
-      if (!costume || !r.mesh || r.mesh.length < 468 || r.similarity < threshold) continue;
-      let e = faces.get(a.id);
-      if (!e && !isConfirmed(a.id)) continue;
-      const rig = rigFrom(r.mesh);
-      if (!e) {
-        faces.set(a.id, e = { cur: rig.slice(), alpha: 0 });
-        if (now - (stung.get(a.id) ?? -Infinity) > STING_GAP_MS) { stung.set(a.id, now); playSting(a.costume); }
+    update(source, list) {
+      const sw = source.videoWidth || source.naturalWidth || source.width, sh = source.videoHeight || source.naturalHeight || source.height;
+      if (sw && sh && (c.width !== sw || c.height !== sh)) { c.width = sw; c.height = sh; }
+      const now = performance.now(), still = !source.videoWidth, seen = new Set(); // a test photo keeps its costume until the next frame
+      for (const x of list) {
+        if (!x.mesh || x.mesh.length < 468) continue;
+        const rig = rigFrom(x.mesh);
+        let e = faces.get(x.id);
+        if (!e) faces.set(x.id, e = { cur: rig.slice(), alpha: 0 });
+        e.costume = COSTUMES[x.costume]; e.target = rig; e.until = still ? Infinity : now + 600; seen.add(x.id);
       }
-      e.costume = costume; e.target = rig; e.until = still ? Infinity : now + 600; seen.add(a.id);
-    }
-    for (const [id, e] of faces) if (!seen.has(id) && e.until > now + 600) e.until = now; // a held photo face that is gone now fades
-    if (faces.size && !raf) raf = requestAnimationFrame(tick);
-  }
+      for (const [id, e] of faces) if (!seen.has(id) && e.until > now + 600) e.until = now; // gone from this frame: a held photo face fades too
+      if (faces.size && !raf) raf = requestAnimationFrame(tick);
+    },
+    /** The lens took this face over: fade the flat costume out. */
+    release(id) { const e = faces.get(id); if (e) { e.until = Math.min(e.until, performance.now()); if (!raf) raf = requestAnimationFrame(tick); } },
+  };
 }
 
 // ---------- the picker (/register and /me) ----------
