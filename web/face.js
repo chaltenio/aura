@@ -87,7 +87,7 @@ async function loadFaceX({ video, onProgress }) {
       if (!faces.length) return [];
       return faces.map((f) => {
         const aligned = alignToArcFace(source, keypoints(f.mesh), cropCtx);
-        return { box: f.box, score: f.faceScore ?? f.score ?? 0, embedding: embed(aligned) };
+        return { box: f.box, score: f.faceScore ?? f.score ?? 0, embedding: embed(aligned), mesh: f.mesh };
       }).sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3]);
     },
     similarity: cosine,
@@ -116,7 +116,7 @@ async function loadHumanEngine({ video, onProgress }) {
     name: 'human',
     async detect(source) {
       const res = await human.detect(source);
-      return (res.face || []).filter((f) => Array.isArray(f.embedding) && f.embedding.length).map((f) => ({ box: f.box, score: f.faceScore ?? f.score ?? 0, embedding: f.embedding })).sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3]);
+      return (res.face || []).filter((f) => Array.isArray(f.embedding) && f.embedding.length).map((f) => ({ box: f.box, score: f.faceScore ?? f.score ?? 0, embedding: f.embedding, mesh: f.mesh })).sort((a, b) => b.box[2] * b.box[3] - a.box[2] * a.box[3]);
     },
     similarity: (a, b) => human.match.similarity(a, b),
     find: (emb, list) => { const r = human.match.find(emb, list); return { index: r.index, similarity: r.similarity }; },
@@ -124,7 +124,8 @@ async function loadHumanEngine({ video, onProgress }) {
 }
 
 let enginePromise = null;
-/** Load the face engine once per page. Returns { name, detect(source), similarity(a,b), find(emb, list) }. */
+/** Load the face engine once per page. Returns { name, detect(source), similarity(a,b), find(emb, list) }.
+ *  detect() -> [{ box, score, embedding, mesh }], largest face first; mesh = 468 FaceMesh [x, y, z] points in source pixels (costumes draw from it). */
 export function loadEngine({ video = false, onProgress } = {}) {
   if (!enginePromise) {
     enginePromise = (ENGINE === 'human' ? loadHumanEngine({ video, onProgress }) : loadFaceX({ video, onProgress }));

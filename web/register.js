@@ -1,5 +1,6 @@
 import { loadEngine, imageFromFile, cropFace } from '/face.js';
 import { api, setMe, unlockAudio, getMe, esc, normLinkedin, normGithub } from '/common.js';
+import { costumePicker } from '/costume.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };
@@ -25,6 +26,8 @@ function refresh() {
   $('submit').disabled = !!missing; $('submit').textContent = missing || 'Register 👻';
 }
 $('consent').onchange = refresh; $('name').oninput = refresh;
+const costume = costumePicker($('costume'), { name: () => $('name').value.trim() }); // optional; Plain unless they tap one
+$('name').addEventListener('input', () => costume.refresh());
 $('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('handle').focus(); });
 $('handle').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('handle').blur(); });
 $('thumbs').onclick = (e) => {
@@ -71,7 +74,7 @@ $('files').onchange = async (e) => {
 $('submit').onclick = async () => {
   $('submit').disabled = true; $('submit').textContent = 'Registering…';
   try {
-    const body = { name: $('name').value.trim(), handle: normGithub($('handle').value), blurb: $('blurb').value.trim(), linkedin: normLinkedin($('linkedin').value), consent: $('consent').checked, descriptors: samples.slice(0, 5).map((s) => s.embedding), avatar: samples[0]?.thumb || null };
+    const body = { name: $('name').value.trim(), handle: normGithub($('handle').value), blurb: $('blurb').value.trim(), linkedin: normLinkedin($('linkedin').value), consent: $('consent').checked, descriptors: samples.slice(0, 5).map((s) => s.embedding), avatar: samples[0]?.thumb || null, costume: costume.value };
     const { id, token } = await api('/api/attendee', { method: 'POST', body });
     // this phone had a card: it is replaced, so the old one stops being findable (said in the notice at the top)
     if (prev?.id && prev.id !== id) await Promise.race([api(`/api/attendee/${prev.id}`, { method: 'PATCH', body: { token: prev.token, consent: false } }).catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);

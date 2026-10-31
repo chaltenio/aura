@@ -1,5 +1,6 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
 import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, renderProfile } from '/common.js';
+import { costumeLayer, costumeTitle, COSTUMES } from '/costume.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };                          // small numbers line under the camera
@@ -13,6 +14,7 @@ const votes = new Map();   // attendeeId -> consecutive frames
 const snoozed = new Map(); // attendeeId -> last seen while their card is closed (Close, or after a haunt)
 let shown = null, shownSim = 0, lastSeenShown = 0, sheetTouched = false, closeTimer = 0;
 const me = getMe();
+const costumes = costumeLayer($('wrap'), { threshold: THRESHOLD }); // draws a recognised person's costume over the camera
 if (!me) { $('melink').textContent = 'Register'; $('melink').href = '/register'; }
 
 const others = () => new Set(index.owners.filter((o) => o.id !== me?.id).map((o) => o.id)).size;
@@ -36,7 +38,8 @@ loadEngine({ video: true, onProgress: (t) => { status(t); $('idle-sub').textCont
 
 let shownId = null, hauntSent = false;
 function renderCard(att, sim) {
-  $('c-name').textContent = att.name; $('c-handle').textContent = att.handle ? '@' + att.handle : ''; $('c-blurb').textContent = att.blurb || '';
+  const title = costumeTitle(att); // "🧛 Count Ada" when they picked a costume; their real name moves to the handle line
+  $('c-name').textContent = title || att.name; $('c-handle').textContent = [title && att.name, att.handle && '@' + att.handle].filter(Boolean).join(' · '); $('c-blurb').textContent = att.blurb || '';
   $('c-sim').textContent = `${(sim * 100).toFixed(0)}% match`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
   $('c-profile').innerHTML = renderProfile(att);
@@ -112,6 +115,7 @@ export async function processFrame(source) {
   }
   if (shown && !sheetTouched && !hauntSent && now - lastSeenShown > AUTO_CLOSE_MS) closeCard(false);
   draw(source, results);
+  costumes.update(source, results, (id) => (votes.get(id) || 0) >= VOTES_NEEDED);
   if (source === $('video')) guide(results);
   return results;
 }
@@ -136,15 +140,16 @@ function draw(source, results) {
   ctx.lineWidth = Math.max(3, sw / 160); ctx.font = `600 ${fs}px -apple-system, system-ui, sans-serif`;
   // the canvas is object-fit: cover, so work out which part of it is on screen; labels stay inside that and below the HUD pills
   const W = c.clientWidth || sw, H = c.clientHeight || sh, k = Math.max(W / sw, H / sh), offX = (sw * k - W) / 2, offY = (sh * k - H) / 2;
-  const minX = offX / k, maxX = (offX + W) / k, minY = (offY + 48) / k;
+  const minX = offX / k, maxX = (offX + W) / k, minY = (offY + 48) / k, maxY = (offY + H) / k;
   for (const r of results) {
     const [x, y, w, h] = r.box;
     const matched = r.attendee && r.similarity >= THRESHOLD; const maybe = r.attendee && r.similarity >= ABSTAIN;
     const color = matched ? '#7CFF6B' : maybe ? '#ffb347' : '#c9c3d6';
-    ctx.strokeStyle = color; ctx.strokeRect(x, y, w, h);
+    const costumed = matched && COSTUMES[r.attendee.costume]; // a costume replaces the box, and the label moves under the chin, clear of hats and horns
+    ctx.strokeStyle = color; if (!costumed) ctx.strokeRect(x, y, w, h);
     const label = matched ? `${r.attendee.name} ${(r.similarity * 100).toFixed(0)}%` : maybe ? `? ${(r.similarity * 100).toFixed(0)}%` : 'unknown';
     const tw = ctx.measureText(label).width + 14, th = fs + 12;
-    const lx = Math.max(minX, Math.min(x, maxX - tw)), ly = y - th >= minY ? y - th : Math.max(minY, y + 4);
+    const lx = Math.max(minX, Math.min(x, maxX - tw)), ly = costumed ? Math.max(minY, Math.min(y + h + 8, maxY - th)) : y - th >= minY ? y - th : Math.max(minY, y + 4);
     ctx.fillStyle = '#000c'; ctx.fillRect(lx, ly, tw, th); ctx.fillStyle = color; ctx.fillText(label, lx + 7, ly + th - 8);
   }
 }

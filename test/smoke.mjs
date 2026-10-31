@@ -108,6 +108,16 @@ try {
     check(pair(dee, cy)?.back === true && pair(cy, dee) && !('back' in pair(cy, dee)), 'haunt back stored as type haunt with back:true; a plain haunt has no back');
     cyWs.close();
   }
+  { // costumes (#22): optional short id, served in the gallery (hunters draw it on the matched face) and on the card; 'plain' or junk clears it
+    const reg = async (name, costume) => (await json('/api/attendee', { method: 'POST', body: { name, consent: true, descriptors: [vec()], costume } })).data;
+    const vi = await reg('Vi', 'vampire'), pl = await reg('Pl'), bad = await reg('Bad', '<img src=x>');
+    const gal = (await json('/api/gallery')).data, costumeOf = (x) => gal.find((y) => y.id === x.id)?.costume;
+    check(costumeOf(vi) === 'vampire' && costumeOf(pl) === null && costumeOf(bad) === null, 'costume: gallery carries the picked costume, null when none or junk');
+    const patch = async (costume) => (await json(`/api/attendee/${vi.id}`, { method: 'PATCH', body: { token: vi.token, costume } })).data;
+    check((await patch('witch')).costume === 'witch' && (await json(`/api/attendee/${vi.id}`)).data.costume === 'witch', 'costume: PATCH changes it and the public card shows it');
+    check((await patch('<b>x</b>')).costume === null && (await patch('witch')).costume === 'witch' && (await patch('plain')).costume === null, 'costume: junk and plain clear it');
+    check((await json(`/api/attendee/${vi.id}`, { method: 'PATCH', body: { token: 'nope', costume: 'ghost' } })).status === 403, 'costume: PATCH needs the token');
+  }
   ws.close();
 
   // admin: auth, block/allow, direct + group message push, events
@@ -139,4 +149,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, static routes)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, static routes)');
