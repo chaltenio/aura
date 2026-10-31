@@ -181,7 +181,10 @@ whenever their socket reconnects).
 
 No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
 pushed like the first (no 429). `/hunt` still sends one haunt per card: the button
-re-arms only after the card closes and that person is found again.
+re-arms only after the card closes and that person is found again. A closed card
+(Close, or 3.5 s after a sent haunt) stays closed while that person is still in
+frame; it re-arms once they have been out of frame for 2.5 s, or when the hunter
+taps the camera. An open card stays on its person until they leave the frame.
 
 ## 4. Flows
 
@@ -199,7 +202,10 @@ re-arms only after the card closes and that person is found again.
    descriptor from the downloaded avatar on the server side? **No**: keep all
    embedding on the client so the server never runs a face model. The client
    fetches the avatar, embeds it, and sends both descriptors.
-5. POST attendee. Land on `/me` with your card and a "Go hunt" button.
+5. POST attendee. Land on `/me?welcome=1` with your card and a "Go hunt" button.
+   Registering again on a phone that already has a card replaces it: the old card
+   is switched off (`PATCH consent:false` with the old token), so one face never
+   has two findable cards.
 
 **Hunt**
 

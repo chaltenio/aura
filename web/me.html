@@ -1,23 +1,35 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a10"><link rel="icon" href="/favicon.svg">
 <title>HAUNT · My card</title><link rel="stylesheet" href="/app.css"></head>
 <body>
-<h1><span class="ghost">👻</span> My card</h1>
-<div class="panel" id="nocard" hidden><p>You're not registered on this phone.</p><a href="/register"><button>Register</button></a></div>
+<header class="top"><a class="brand" href="/">👻 HAUNT</a><a class="top-link" href="/hunt">Hunt</a></header>
+<div id="nocard" hidden>
+  <h1>My card</h1>
+  <div class="panel"><p>You're not registered on this phone, so nobody can find you or haunt you yet.</p><a class="btn" href="/register">Register (be findable)</a><a class="btn secondary" href="/hunt">Just hunt</a></div>
+</div>
 <div id="has" hidden>
-  <div class="panel card"><img id="avatar" hidden><div class="noavatar" id="noavatar">👤</div><div><div class="name" id="name"></div><div class="handle" id="handle"></div><div class="blurb" id="blurb"></div><div class="sim" id="stats"></div></div></div>
-  <div class="panel"><div id="profile"></div><details><summary class="hint">Edit handle / LinkedIn</summary><label for="ghhandle">GitHub handle</label><input id="ghhandle" type="text" autocapitalize="none"><label for="linkedin">LinkedIn URL</label><input id="linkedin" type="text" autocapitalize="none" placeholder="https://www.linkedin.com/in/you"><button class="secondary" id="save">Save</button></details></div>
-  <div class="panel"><h2>Costume</h2><div id="costume"></div></div>
+  <div class="panel notice" id="welcome" hidden>🎉 <b>You're findable.</b> Phones in the room can recognize you now. Keep this page open to hear it when someone haunts you, or go hunt.</div>
   <div class="panel">
-    <button id="arm">🔊 Sound on (tap anywhere once to wake it)</button>
-    <a href="/hunt"><button class="secondary">Go hunt</button></a>
-    <div class="check"><input id="consent" type="checkbox"><label for="consent" style="margin:0">Findable (uncheck to vanish from every phone immediately)</label></div>
-    <button class="danger" id="forget">Forget me on this phone</button>
+    <div class="card"><img id="avatar" alt="" hidden><div class="noavatar" id="noavatar">👤</div><div><div class="name" id="name"></div><div class="handle" id="handle"></div><div class="blurb" id="blurb"></div></div></div>
+    <div class="stats"><div><b id="n-out">0</b>you haunted</div><div><b id="n-in">0</b>haunted you</div></div>
+    <div id="profile"></div>
   </div>
+  <a class="btn" href="/hunt">👻 Go hunt</a>
+  <button class="secondary" id="arm">🔊 Sound on (tap anywhere once to wake it)</button>
   <h2>Tonight's connections <span id="nconn"></span></h2>
   <div class="conn-actions" id="connact" hidden><button class="secondary" id="copy">Copy as text</button><button class="secondary" id="share" hidden>Share</button></div>
   <ul class="conns" id="conns"></ul>
+  <div class="panel"><h2>Costume</h2><div id="costume"></div></div>
+  <div class="panel">
+    <div class="switch"><label for="consent">Findable<small id="consent-note">Phones in the room can recognize you</small></label><input id="consent" type="checkbox" role="switch"></div>
+    <details class="more"><summary class="hint">Edit GitHub and LinkedIn</summary>
+      <label for="ghhandle">GitHub username</label><input id="ghhandle" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="octocat">
+      <label for="linkedin">LinkedIn profile</label><input id="linkedin" type="url" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="linkedin.com/in/your-name">
+      <button class="secondary" id="save">Save</button><div class="status" id="save-note"></div>
+    </details>
+  </div>
+  <button class="ghost-btn danger-text" id="forget">Forget me on this phone</button>
 </div>
-<p class="hint"><a href="/">Home</a></p>
 <script type="module" src="/me.js"></script>
 </body></html>
