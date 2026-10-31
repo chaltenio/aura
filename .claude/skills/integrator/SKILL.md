@@ -83,7 +83,9 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 
 7. **Update TODO.md.** Rewrite only the `## STATUS` paragraph (date, what is on main and working, what is broken, who is blocked). Tick tasks that landed. Do not reassign tasks; ask the owner instead.
 
-8. **Answer the bus.** For every new `[ASK]` since the last pass, reply with `scripts/bus.sh answer "<quote the ask> -> <answer>"` if the answer is in ARCHITECTURE.md, TODO.md, or the code; otherwise name who should answer. For every `[CLAIM]`, check TODO.md has the owner; if two people claimed the same file, say so on the bus. Treat `[DECIDE]` lines as standing orders and copy them into TODO.md Decisions.
+8. **Read plans.** For every new `[PLAN]` line since the last pass, check its files against in-flight branches and Now rows; if two plans touch the same file or build the same demo moment, post `[ASK] @a @b overlapping plans on <file/feature>: <who takes what>` before either writes code. A plan that adds a core field or route gets one line in TODO.md Decisions so ARCHITECTURE.md is updated when it lands.
+
+8b. **Answer the bus.** For every new `[ASK]` since the last pass, reply with `scripts/bus.sh answer "<quote the ask> -> <answer>"` if the answer is in ARCHITECTURE.md, TODO.md, or the code; otherwise name who should answer. For every `[CLAIM]`, check TODO.md has the owner; if two people claimed the same file, say so on the bus. Treat `[DECIDE]` lines as standing orders and copy them into TODO.md Decisions.
 
 9. **Log and speak.**
    - Append one line to `docs/INTEGRATION_LOG.md` in the documented format.

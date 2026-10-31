@@ -1,6 +1,6 @@
 ---
 name: start
-description: Onboarding conversation for anyone coming online in the HAUNT repo. Reads the bus, TODO.md and the branches in flight, greets the person by name with a five-line picture of what is live, claimed, unclaimed and in flight, asks what they want to build, maps the answer to ARCHITECTURE.md and to who is near those files, then claims it on the bus, creates their branch (or worktree), adds the TODO row, pushes it, and explains the loop. Use at the start of every fresh session, or when someone says "what should I work on", "where are we", "onboard me", "/start".
+description: Onboarding interview for anyone coming online in the HAUNT repo. Reads the bus, TODO.md and the branches in flight, greets the person by name with a five-line picture of what is live, claimed, unclaimed and in flight, asks what they want to build, then interviews their idea (four questions) for fit against ARCHITECTURE.md, the parked list and current claims, gives a fit verdict, writes a five-line plan to the board, claims it, creates their branch (or worktree), adds the TODO row, pushes it, and explains the loop. Use at the start of every fresh session, or when someone says "what should I work on", "where are we", "onboard me", "/start".
 ---
 
 # /start: steer a teammate into work that fits everyone else's
@@ -36,13 +36,24 @@ Yours: <name>/<task> (<ahead> commits, last <when>)        <- only if they alrea
 ```
 Then ask exactly one question: **"What do you want to build?"** If they already have an unmerged branch, the first option is "Continue <branch>". Then the top three unclaimed items from IDEAS.md section 3 (show effort and track; prefer S effort, items that unblock others, and files nobody is touching), then "something else". Use `AskUserQuestion` when it is available, otherwise plain text with numbered options.
 
-Skip the greeting only if the person's first message is already a concrete task; then go straight to step 3 with that task.
+Skip the greeting only if the person's first message is already a concrete task; then go straight to step 3 with that task. Tiny fixes (a typo, a one-line bug on a file they own) skip the interview: claim, branch, go.
 
-## 3. Map the answer to the contract
+## 3. Interview the idea (the part that keeps the project coherent)
 
-- Name which pages, endpoints and events in ARCHITECTURE.md it touches (`/register`, `/hunt`, `/screen`, `POST /api/haunt`, ws `haunted`, ...), and the files that implement them (`web/<page>.js`, `server/index.js`).
-- Check overlap: any in-flight branch whose `files=` list intersects, any Now row whose files are the same. If there is overlap, say who, which file, and propose the smallest split (e.g. "take the `/screen` side; Sam has `server/index.js` until 2:15").
-- If the idea is not in TODO.md, write a one-line task for it. If it breaks a DECIDE on the bus or a product rule in CLAUDE.md (faces to a hosted model, consent as a UI nicety), say so and offer the nearest allowed version.
+If they picked a backlog item, the row already answers most of this; confirm scope and skip to the verdict. If they brought their own idea, or a vague one, ask these four questions in one message (numbered, short), then wait:
+
+1. **What will someone see?** The one demo moment: which page, who is holding the phone, what appears. If they cannot say it in one sentence, help them find it before anything else.
+2. **Why does it fit HAUNT?** HAUNT = opt-in face-to-profile recognition at an event plus the haunt interaction; everything else is a layer on top (README "Layers"). Which layer is this, or which sponsor track does it serve (Shelled runs, Fetch.ai matchmaker, TrueForge self-improving agent)? Check IDEAS.md section 4 (parked ideas): if it is parked, read the "what would un-park it" cell aloud and ask whether that condition is now met.
+3. **What does it need from the core?** Which endpoints, events or pages (ARCHITECTURE.md section 3 API table, docs/DIAGRAM.md message table). If the core must change, name the exact field or route to add and who owns that file right now.
+4. **How will we know it works, and by when?** A test in `npm test`, a phone check, or a screen check; and whether it is demoable in under 90 minutes. If not, cut it to the first demoable slice and park the rest as a TODO Next row.
+
+Then give the **fit verdict** in three lines:
+
+- **Fits** / **Fits with a cut** / **Conflicts** / **Parked for a reason**. Name the reason from ARCHITECTURE.md, IDEAS.md, a bus `[DECIDE]`, or a CLAUDE.md rule (no face or embedding to a hosted model; consent is not optional; main is merge-only).
+- **Overlap:** any in-flight branch whose `files=` intersects, any Now row on the same files. Say who, which file, and the smallest split ("take the `/screen` side; Sam has `server/index.js` until 2:15"), or "none".
+- **Plan:** five lines max: slice 1 (demoable), slice 2, files touched, endpoints/events used or added, verification. Post it: `scripts/bus.sh post "[PLAN] @<name> <task>: <slice 1> | files <..> | needs <..> | verify <..>"`. The integrator reads plans each pass and will flag collisions before code exists.
+
+A "Conflicts" verdict is not a refusal: offer the nearest version that fits (same demo moment, different file or layer). If they insist on an idea outside HAUNT, say so once, record it on the bus as `[DECIDE]`-pending for the user, and let them proceed on their branch; the merge step is where it gets judged.
 
 ## 4. Claim, branch (or continue), record, push
 
@@ -66,4 +77,5 @@ git add TODO.md && git commit -qm "todo: $name claims $task" && scripts/sync.sh 
 
 - Commit each working step; `scripts/sync.sh` after every commit (pushes your branch; 15-minute rule).
 - `scripts/bus.sh post` when something others should know lands; `scripts/bus.sh ask` when stuck.
-- `/merge` when the step is demoable. Never edit on `main`; never edit before claiming.
+- `scripts/bus.sh ready` (the integrator merges it) or `/merge` when the slice is demoable. Never edit on `main`; never edit before claiming.
+- Changed your plan? Post a new `[PLAN]` line; silent scope drift is how two people end up building the same thing.
