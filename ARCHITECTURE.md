@@ -56,29 +56,43 @@ HTTPS (camera, mic, and motion sensors are all gated on both).
 
 ### 1.2 Face engine (in the browser)
 
-Library: `@vladmandic/human` (TensorFlow.js). It gives face detection, alignment,
-and a **face descriptor** (embedding) per face, plus a `human.match.find()` helper
-that compares a descriptor against a gallery. It runs in Safari on WebGL. Pending
-confirmation from research: current version, model sizes, iPhone frame rate.
+Library: `@vladmandic/human` v3.3.6 (MIT, TensorFlow.js). One script tag gives
+face detection (BlazeFace), alignment (FaceMesh) and a 1024-float descriptor
+(FaceRes), about 9 MB of weights, plus `human.match.find(descriptor, gallery)`.
+Run it on the **wasm backend**: WebGL on iPhone is float16 and degrades
+descriptors, and the WebGPU backend has an open 90-degree video rotation bug on
+iOS 26. Alternative if accuracy disappoints: FaceX (Apache-2.0, ArcFace-style
+512-d via onnxruntime-web). See RESEARCH.md section D.
 
-Pipeline per video frame (throttle to ~3 to 5 fps on phones):
+Pipeline per video frame (throttle to 3 to 5 fps; more than ~8 inferences/s
+thermally throttles iPhones):
 
-1. `human.detect(video)` -> faces with box + descriptor.
-2. For each face: cosine similarity against every gallery descriptor.
-3. Best match above `THRESHOLD` -> show card for that attendee, anchored to the box.
-4. Below threshold -> draw a neutral box ("unknown wanderer"), nothing else.
+1. `human.detect(video)` at ~320 px input -> faces with box + descriptor. Skip
+   faces whose box is under ~80 px or whose frame is blurry (Laplacian variance).
+2. For each face: `match.find` against the gallery (cosine similarity).
+3. Three-zone decision, borrowed from lazo: similarity >= 0.5 is a match,
+   0.4 to 0.5 abstains (draw the box, no name), below 0.4 is discarded.
+4. A match must hold for **3 consecutive frames** before the card appears, which
+   kills flicker and false positives.
 
-Two descriptors per attendee (profile photo + live selfie) and take the max
-similarity. Profile photos are often old or filtered; the live selfie taken in
-the room's lighting is the one that actually matches.
+Enrollment: **3 selfies** at registration, descriptors averaged into one
+normalized centroid, plus one descriptor from the profile photo. Store both and
+take the max similarity. The live selfie taken in the room's lighting is the one
+that actually matches; profile photos are often old or filtered.
 
-Threshold: start at **0.55** cosine similarity (Human's own demos use ~0.5 to
-0.6). Tune on the team's faces in the real room before the demo. Prefer false
-negatives over false positives: a wrong name on a stranger is the worst outcome.
+Tune the threshold on the team's faces in the real room before the demo. Prefer
+false negatives over false positives: a wrong name on a stranger is the worst
+outcome. Backlit windows and stage lights are the main failure mode; enable
+Human's `filter.equalization`.
 
-Model loading: ~10 MB of weights. Load on `/register` while the user is reading
-the consent text, cache in the browser, and reuse on `/hunt`. Show a progress bar;
-do not open the camera until models are warm.
+Model loading: ~9 MB. Load on `/register` while the user reads the consent
+text, rely on the HTTP cache, show a progress bar, and do not open the camera
+until models are warm.
+
+Server-side fallback if phones are too slow: DeepFace in Docker (MIT, `/register`
+and `/search` REST endpoints, ~5 minutes to stand up on an amd64 host); the
+phone posts one JPEG every ~500 ms. Faces then do leave the phone, so say so on
+the consent screen if this path is taken.
 
 ### 1.3 Server (Node, one process)
 
@@ -193,7 +207,7 @@ every phone within one refresh.
 | Failure | Mitigation |
 |---|---|
 | Dim party lighting, no match | Live selfie taken in the same room; lower threshold only after testing; QR on badge as fallback identity |
-| iOS kills camera when tab backgrounds | Re-acquire stream on `visibilitychange`; show a "tap to resume" overlay |
+| iOS kills camera when tab backgrounds | Re-acquire stream on `visibilitychange`; show a "tap to resume" overlay. Only one active getUserMedia at a time; `<video autoplay muted playsinline>` is mandatory; `facingMode: 'environment'` may pick the ultra-wide lens, so prefer the device labelled "Back Camera" |
 | Audio does not play on the haunted phone | Unlock Web Audio with a silent buffer on the register tap; keep the page open (no Web Push in the core) |
 | Phone too slow for the model | Downscale video to 320 px for detection; detect every Nth frame; fall back to a server-side match endpoint (one JPEG frame) if research finds a quick OSS service |
 | Two attendees look alike / twins | Show top-2 when the margin between them is < 0.05 and let the hunter pick |

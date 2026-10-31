@@ -167,3 +167,42 @@ https://bugs.webkit.org/show_bug.cgi?id=301627 , https://howaiworks.ai/blog/tran
 1. Narrator with TTS on the big screen (S, high, pure Messages API).
 2. Matchmaker on Agentverse (S, high, Fetch.ai track).
 3. Demogorgon photo-to-zone localizer with memory on TrueForge (M, high, TrueForge track).
+
+---
+
+## D. Browser face recognition (the core)
+
+### Libraries
+
+| Library | Facts | Verdict |
+|---|---|---|
+| **@vladmandic/human** | v3.3.6 (Aug 2025), 3.4k stars, MIT. BlazeFace detect (0.5 MB) + FaceMesh (1.5 MB) + FaceRes 1024-d embedding (7 MB) ≈ 9 MB. `human.match.similarity(a,b)`, `human.match.find(emb, db)` -> `{index, similarity}`. Wiki: >0.5 similarity is a match; demo gates at 0.4. Demos ran on iPhone; maintainer calls Safari WebGL "really bad", so use the **wasm** backend. FaceRes is weaker than ArcFace. https://github.com/vladmandic/human , https://github.com/vladmandic/human/wiki/Embedding , demo https://vladmandic.github.io/human/demo/facematch/index.html | **use this** |
+| **FaceX** | 350 stars, Apache-2.0, pushed May 2026. ArcFace-style 512-d via onnxruntime-web WASM, 0.8 to 8.4 MB models (LFW 95.6 to 99.1%). Threshold >0.3 cosine. Weights are AES-encrypted and must be decrypted via WebCrypto (extra step). No iOS testing documented. https://github.com/facex-engine/facex , https://github.com/facex-engine/facex/wiki/Browser-Quickstart | alternative if Human's accuracy disappoints |
+| InsightFace via onnxruntime-web | Best accuracy (buffalo), but weights are **non-commercial research only**. https://pypi.org/project/insightface/ | skip (license) |
+| face-api.js / @vladmandic/face-api | Dead (2020) / archived Feb 2025. | skip |
+| MediaPipe | Detect, landmarks, stylize only. **No identity embedding.** | detector only |
+
+### Prior art ("recognize registered people from a phone camera")
+
+- **lazo** — MIT, pushed 2026-10-20, TypeScript + onnxruntime-web. **Consent-first enrollment** (5 guided shots -> centroid template), quality gate (Laplacian blur, pose), 1:N cosine search, **3-zone decision** (≥0.38 affirm, 0.30 to 0.38 abstain, <0.30 discard), 3-of-4-frame voting over 1.5 s dwell, AES-GCM encrypted IndexedDB gallery, HTTPS phone dev mode. Closest match to HAUNT's ethics and pipeline. **Borrow its enrollment UX and decision logic.** iOS untested. https://github.com/nievesjesus/lazo
+- eidon — MIT, Rust/WASM + onnxruntime-web, 5-pose enrollment, 0.40 threshold. Reference only. https://github.com/FrancescoCitti/eidon
+- Attendance apps on face-api.js (old stack): https://github.com/jolwnn/Student-Attendance-Management-System-MERN , https://github.com/ferryops/facial-recognition-attendance-system (Next.js + Supabase pattern)
+- **No OSS "who is this at the conference" camera app exists.** HAUNT is novel here.
+
+### Server-side fallback
+
+- **DeepFace** — 23.6k stars, MIT, pushed today. Docker `serengil/deepface:latest` (227 MB, amd64), REST on :5005 with `/represent`, `/register`, `/search`. ~5 min to stand up; first call downloads weights. https://github.com/serengil/deepface
+- CompreFace — amd64 only (no arm64, needs AVX), won't run natively on Apple Silicon. https://github.com/exadel-inc/CompreFace . Skip.
+- InsightFace-REST — TensorRT-first. Skip.
+
+### Gotchas (iOS)
+
+- HTTPS required. `<video autoplay muted playsinline>` or Safari shows one frame. Start the stream from a tap. **Only one active getUserMedia at a time.**
+- `facingMode: 'environment'` may pick the ultra-wide; enumerate devices and prefer the label containing "Back Camera".
+- WebGL context is lost on backgrounding/lock; handle `webglcontextrestored`. Easier: use the **wasm** backend (float32; WebGL on iPhone is float16 and degrades embeddings). tfjs WebGPU on iOS 26 rotates video 90° (open bug) — avoid.
+- If using onnxruntime-web: load `ort.wasm.min.js` (not `ort.min.js`, which balloons memory in WebKit), `numThreads = 1` without COOP/COEP. Sustained >8 inferences/s thermally throttles; run detection at 3 to 5 fps and embed only when a face is stable.
+- Thresholds: Human similarity ≥ 0.5 (abstain band 0.4 to 0.5); ArcFace-family cosine 0.40 to 0.45. Enrol 3 to 5 selfies, store the normalized centroid, min face box ~80 px, reject blurry frames, vote over 3 consecutive frames. Backlit windows and stage spots are the main failure mode; enable Human's `filter.equalization`.
+
+### Use this
+
+**@vladmandic/human**, wasm backend, ~320 px input, 3 to 5 fps. Enrol with 3 selfies -> centroid 1024-d vector stored with the profile. Ship all opt-in embeddings to `/hunt` as one JSON; match client-side at ≥ 0.5 with 3-frame voting and lazo's abstain band. Keep **DeepFace Docker** as the 20-minute fallback (POST a JPEG every ~500 ms, match server-side).
