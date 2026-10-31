@@ -8,6 +8,7 @@
 #   scripts/bus.sh post   "<text>"     STATUS: what you just landed / are doing (name the files)
 #   scripts/bus.sh claim  "<text>"     CLAIM: "#7 hunt.js 3-frame vote" before you start (and put your name in TODO.md)
 #   scripts/bus.sh ready  "<text>"     READY: "<branch>: what it does" -> the integrator merges it into main
+#                                      (a finished job runs scripts/ready.sh instead: it syncs, tests, opens the PR, then posts this)
 #   scripts/bus.sh ask    "<text>"     ASK: a question for the team / integrator
 #   scripts/bus.sh answer "<text>"     ANSWER: reply to an ASK (quote it)
 #   scripts/bus.sh decide "<text>"     DECIDE: a decision everyone must follow (also add to TODO.md Decisions)
