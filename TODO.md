@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 15:02 PT.** LIVE: https://aura-haunt.fly.dev runs 270e34d, which is current `main`; CI green; prod holds 2 attendees and 4 events (first real use). On `main`: FaceX hybrid engine, Express + ws server (gallery, haunt push with Haunt back, cooldown, kill switch, `/api/version`, `/api/me/:id` with tonight's connections), API smoke test, four sign-in providers behind env vars, hooks, `/start`, launcher, docs/scout/README.md Scout plan. In flight: Matt claimed two rows at 15:00, both numbered #22 on their branches: `mthomas100/linkedin-live` (LinkedIn OIDC app + `LINKEDIN_CLIENT_ID/SECRET` in secrets/prod.enc.env and on Fly; code already on main) keeps #22, and `mthomas100/costumes` (optional look on /register and /me, drawn on the matched face on /hunt from the mesh, on-device; web/costume.js, face.js, hunt.js, register.*, me.*, ~5 server lines) becomes #23, renumbered on the branch before /merge. costumes touches web/hunt.js and server/index.js, which tarecq's Scout slice 1 (hunt badge, mount line, `id` on the haunted push) and Chris's #21 admin panel (server hooks, web/common.js) also touch: three plans on server/index.js, two on hunt.js; land small, sync often. Chris's branch is still not pushed. #17 Most Wanted and #20 digest are unclaimed. Drift: ARCHITECTURE.md still lacks `GET /api/version` (Matt); smoke boot wait fix open (Matt). No Shelled run yet; EDGE_CASES.md is the template (#6/#7, tarecq). Stale: matt/next (70 min, one 13:51 log line) and tarecq/scout-explore (fully on main); delete both with a bus line. Nobody blocked.
+**2026-10-31 15:13 PT.** LIVE: https://aura-haunt.fly.dev deploys a9fafdc, which is current `main`; `npm test` green; prod holds 2 attendees and 6 events. Landed since 15:22: LinkedIn OIDC prod secrets (encrypted, secrets/prod.enc.env); Chris's #21 admin panel (`/admin` behind `ADMIN_TOKEN`: users without tokens or descriptors, block/unblock, delete, direct + group `admin_message`, meetup events with `meetupId` on haunts; contract updated; blocked attendees leave the gallery and cannot haunt or be haunted), merged with the GitHub button on PR #4 as a merge commit instead of /merge; Matt's docs/ROOM_SCAN.md brief for #13, landed by the integrator from a READY line. `/admin` on prod needs `ADMIN_TOKEN` in secrets/prod.enc.env + fly secrets (Matt). In flight (Matt): `mthomas100/costumes` (costume field; TODO row still 22, must be #23; its gallery line now conflicts with admin's blocked filter, sync first), `mthomas100/linkedin-live` (#22), `mthomas100/sound-default` (#25: vibrate before audio is armed, first tap arms the shriek; web/common.js, me.*), `mthomas100/ui-polish` (#26: phone UX pass on register/hunt/screen/calibrate/index + app.css; me.*/common.js only after #25). tarecq: Scout slice 1 (server/scout.js, web/scout.js, `POST /api/rating`, `match` events, `id` on the haunted push); docs/scout and IDEAS 2b still say `/api/attendee/:id/card` (the route is `GET /api/attendee/:id`); Matt is offering #13 room scan to tarecq. #17 Most Wanted and #20 digest are unclaimed. Smoke boot wait fix (test/smoke.mjs i < 450 + actions/cache) still open (Matt). No Shelled run executed yet; EDGE_CASES.md is the template (#6/#7, tarecq). Stale: matt/next (80 min, one 13:51 log line) and tarecq/scout-explore (fully on main); delete both with a bus line. Nobody blocked.
 
 ## Now (this hour)
 
@@ -26,9 +26,10 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 8 | GitHub OAuth, then LinkedIn OIDC (store picture bytes, not the URL) on `/register` | main session (GitHub/LinkedIn), Chris (Google/Apple) | [x] |
 | 9 | Decide the second track: **Fetch.ai, as the Scout** (IDEAS.md 2b: find people by face not name, clue nudge, hunt confirms, post-haunt rating). TrueForge dropped: needs venue photos + two measured runs. | tarecq | [x] |
 | 10 | Scout (Fetch.ai): Agentverse registration (mailbox) -> pairwise scoring + clue nudge over `state` -> match badge on `/hunt` -> post-haunt rating + predicted-vs-actual on `/screen`; 3 tries through ASI:One, one change from feedback | tarecq | [ ] |
+| 21 | Admin panel `/admin`: attendees, allow/disallow, direct + group messages, open/close events (`ADMIN_TOKEN`) | Chris | [ ] |
 | 11 | Roles on join (Hunter / Ghost / Medium / Possessed) and role-gated views | | [ ] |
 | 12 | Narrator agent: event feed -> Claude -> TTS on `/screen` | | [ ] |
-| 13 | Room scan: Scaniverse -> SPZ -> Spark on `/screen` with live markers | | [ ] |
+| 13 | Room scan: Scaniverse -> SPZ -> Spark on a new `/room` page, ghosts on live haunts. Brief: docs/ROOM_SCAN.md. Matt is offering it to tarecq (15:05) | | [ ] |
 | 14 | Sigil posters (AR.js pattern markers + QR fallback) and `/zone` events | | [ ] |
 | 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | | [ ] |
 | 16 | Feedback swap with one other team (Stranger Builds requirement) and one change from it | | [ ] |
@@ -43,6 +44,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 |---|------|-------|
 | 0 | Repo, README, ARCHITECTURE, RESEARCH (5 sections), EDGE_CASES template, CLAUDE.md, integrator skill, sync.sh | main session + fork |
 | - | GitHub profile enrichment on cards (bio, location, pushes this week, repos, LinkedIn link), 4be2a21 | main session |
+| 24 | No haunt rate limit: `/api/haunt` drops the 60 s per-pair cooldown (429); a repeat haunt is written and pushed like the first, 8df2d4e | Matt |
 
 ## Decisions
 
@@ -54,5 +56,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 - Haunt back adds `back:true` on `POST /api/haunt` and a haunted-back push; connections adds `GET /api/me/:id`. Both land in ARCHITECTURE.md in the same commit as the code (Matt's [PLAN]s, 14:31).
 - Admin panel adds `/admin` behind `ADMIN_TOKEN`, admin block/unblock (separate from the attendee kill switch), direct and group ws messages and event open/close; ARCHITECTURE.md in the same commit as the code (Chris's [PLAN], 14:44).
 - Costumes add an optional `costume` field on the attendee (picked at /register or /me, drawn on-device on /hunt); the attendee shape in ARCHITECTURE.md changes in the same commit (Matt's [PLAN], 15:00). Row numbers: #21 admin panel (Chris), #22 LinkedIn live (Matt), #23 costumes (Matt).
+- sync.sh (9a867ae, 15:06, Matt): once a branch is pushed it merges origin/main in instead of rebasing, so a push never needs force; unpushed branches still rebase; /merge flattens at landing. Never force-push, even with a lease.
+- No haunt rate limit (#24, 8df2d4e, 15:02, Matt): a repeat haunt or haunt back is 200, written and pushed; `/hunt` re-arms the button only after the card closes and the person is found again.
 - Never close a PR or issue, or delete a branch, without a comment saying why and where the work went (13:51, CLAUDE.md). `/merge` and the integrator comment on the open PR before deleting its branch.
 

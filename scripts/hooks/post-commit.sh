@@ -5,11 +5,21 @@
 input=$(cat)
 cmd=$(printf '%s' "$input" | json_get tool_input.command)
 case "$cmd" in *"git commit"*) ;; *) exit 0 ;; esac
-enter_repo "$(printf '%s' "$input" | json_get cwd)"
+# the repo the commit ran in: `cd <dir>` / `git -C <dir>` in the command wins (agents commit in other worktrees),
+# else the session cwd; relative paths resolve from the session cwd
+sess=$(printf '%s' "$input" | json_get cwd); [ -n "$sess" ] && cd "$sess" 2>/dev/null
+dir=$(printf '%s' "$cmd" | cmd_dir)
+case "$dir" in "~"/*) dir="$HOME/${dir#\~/}" ;; esac
+{ [ -n "$dir" ] && [ -d "$dir" ]; } || dir="$sess"
+enter_repo "$dir"
 branch=$(current_branch)
 [ -z "$branch" ] && exit 0
+sha=$(git rev-parse --short HEAD 2>/dev/null)
+[ "$(cat .bus/last-commit 2>/dev/null)" = "$sha" ] && exit 0                                   # this commit was already posted
+[ $(( $(date +%s) - $(git log -1 --format=%ct 2>/dev/null || echo 0) )) -gt 180 ] && exit 0    # the commit failed; HEAD is old
+echo "$sha" > .bus/last-commit
 subject=$(git log -1 --format=%s 2>/dev/null)
-[ -n "$subject" ] && bus_bg post "COMMIT $branch: $subject"
+[ -n "$subject" ] && bus_bg post "COMMIT $branch: $subject ($sha)"
 [ "$branch" = "main" ] && exit 0
 ahead=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)
 first=$(git log --format=%ct origin/main..HEAD 2>/dev/null | tail -1)

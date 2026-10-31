@@ -170,10 +170,13 @@ on a `gallery_changed` socket message).
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
 | GET | `/api/version` | `{version, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`), boot time, counts. Used by deploy and integrator checks |
-| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores) |
+| GET | `/admin` | Admin page; asks for the token, calls the routes below |
+| any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
+| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
 
-Rate-limit haunts per pair (one per 60 s) so a phone pointed at someone does not
-spam them.
+No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
+pushed like the first (no 429). `/hunt` still sends one haunt per card: the button
+re-arms only after the card closes and that person is found again.
 
 ## 4. Flows
 
@@ -238,7 +241,7 @@ every phone within one refresh.
 2. **PR 2, hunt:** `/hunt` camera loop, matching, card overlay, `/api/haunt`,
    socket push, shriek + flash. This is the demo.
 3. **PR 3, polish:** GitHub OAuth, LinkedIn OIDC, `/screen` feed and leaderboard,
-   rate limits, kill switch broadcast.
+   kill switch broadcast.
 
 Then layers 4 to 6 from the README.
 

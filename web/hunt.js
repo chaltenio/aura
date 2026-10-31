@@ -40,7 +40,7 @@ $('dismiss').onclick = () => { $('sheet').classList.remove('show'); shown = null
 $('haunt').onclick = async () => {
   if (!shown || !me || hauntSent) return; $('haunt').disabled = true; hauntSent = true;
   try { await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: shown.id, similarity: shownSim } }); $('haunt').textContent = `You haunted ${shown.name} 👻`; }
-  catch (e) { $('haunt').textContent = e.status === 429 ? 'Already haunted recently' : 'Failed: ' + e.message; }
+  catch (e) { $('haunt').textContent = 'Failed: ' + e.message; }
 };
 
 /** Shared by the live loop and the photo test. Returns per-face results. */
