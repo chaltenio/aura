@@ -1,64 +1,90 @@
-import { loadEngine, imageFromFile, cropFace, ENGINE } from '/face.js';
-import { api, setMe, unlockAudio, getMe } from '/common.js';
+import { loadEngine, imageFromFile, cropFace } from '/face.js';
+import { api, setMe, unlockAudio, getMe, esc, normLinkedin, normGithub } from '/common.js';
 import { costumePicker } from '/costume.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };
-const descriptors = []; let avatar = null; let stream = null; let engine = null;
+const WANT = 3;
+const samples = []; // { embedding, thumb, from? } per accepted selfie or photo (from = sign-in provider); the first thumb becomes the card avatar
+let stream = null; let engine = null;
+const prev = getMe();
 
-const engineReady = loadEngine({ video: false, onProgress: status }).then((h) => { engine = h; status(`Face model ready (${ENGINE}). Take 3 selfies or add photos.`); return h; }).catch((e) => status('Model failed to load: ' + e.message));
+const engineReady = loadEngine({ video: false, onProgress: (t) => { if (t !== 'ready') status('Loading face model… (first time only)'); } })
+  .then((h) => { engine = h; if (!samples.length) status('Face model ready. Take 3 selfies, or add photos.'); return h; })
+  .catch(() => status("The face model didn't load. Check your connection and reload the page."));
 
 function refresh() {
-  $('n').textContent = String(Math.min(descriptors.length, 3));
-  $('submit').disabled = !(descriptors.length >= 1 && $('consent').checked && $('name').value.trim());
+  const n = samples.length, profile = samples.find((s) => s.from), selfies = samples.filter((s) => !s.from).length;
+  $('selfies').querySelector('h2').textContent = profile ? `Face signature: your ${profile.from} photo` : 'Three selfies';
+  $('thumbs').innerHTML = Array.from({ length: Math.max(WANT, n) }, (_, i) => samples[i]
+    ? `<button class="slot filled" data-i="${i}" aria-label="Remove selfie ${i + 1}"><img src="${samples[i].thumb}" alt=""></button>`
+    : `<div class="slot">${i + 1}</div>`).join('');
+  $('capture').textContent = profile ? `Take selfie ${selfies + 1} (optional)` : n < WANT ? `Take selfie ${n + 1} of ${WANT}` : 'Take another (optional)';
+  $('start').textContent = profile && !selfies ? '📷 Add a selfie too (optional)' : n ? '📷 Take more selfies' : '📷 Open selfie camera';
+  $('start').className = n >= WANT || profile ? 'secondary' : ''; // enough to register: the next step is the box and Register, not more photos
+  const missing = !$('name').value.trim() ? 'Add your name to continue' : !n ? 'Take a selfie to continue' : !$('consent').checked ? 'Tick the box to agree' : '';
+  $('submit').disabled = !!missing; $('submit').textContent = missing || 'Register 👻';
 }
 $('consent').onchange = refresh; $('name').oninput = refresh;
 const costume = costumePicker($('costume'), { name: () => $('name').value.trim() }); // optional; Plain unless they tap one
 $('name').addEventListener('input', () => costume.refresh());
+$('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('handle').focus(); });
+$('handle').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('handle').blur(); });
+$('thumbs').onclick = (e) => {
+  const b = e.target.closest('.slot.filled'); if (!b) return;
+  samples.splice(Number(b.dataset.i), 1); refresh(); status(`Removed. ${samples.length} of ${WANT} left.`);
+};
 
-async function addSample(source, label) {
-  await engineReady; if (!engine) return;
-  status(`Analyzing ${label}…`);
+async function addSample(source, label, from = null) {
+  await engineReady; if (!engine) return false;
+  status(`Checking ${label}…`);
   const faces = await engine.detect(source);
-  if (faces.length === 0) { status(`No face found in ${label}. Try better light, face the camera.`); return; }
-  if (faces.length > 1) { status(`${faces.length} faces in ${label}; using the largest.`); }
+  if (faces.length === 0) { status(`No face found in ${label}. Face the camera in good light.`); return false; }
   const f = faces[0];
-  if (f.box[2] < 60 || f.box[3] < 60) { status(`Face too small in ${label}; get closer.`); return; }
-  descriptors.push(f.embedding);
-  const thumb = cropFace(source, f.box);
-  if (!avatar) avatar = thumb;
-  const img = document.createElement('img'); img.src = thumb; $('thumbs').appendChild(img);
-  status(`Got ${descriptors.length} sample${descriptors.length > 1 ? 's' : ''} (face score ${f.score.toFixed(2)}).${descriptors.length < 3 ? ' Take another from a slightly different angle.' : ' Good to go.'}`);
-  refresh();
+  if (f.box[2] < 60 || f.box[3] < 60) { status(`Your face is too small in ${label}. Come closer.`); return false; }
+  samples.push({ embedding: f.embedding, thumb: cropFace(source, f.box), ...(from && { from }) });
+  const n = samples.length, many = faces.length > 1 ? ' More than one face there: kept the biggest.' : '';
+  status(n < WANT ? `Got ${n} of ${WANT}.${many} Turn your head a little for the next one.` : `Got ${n}. Looking good.${many}`);
+  refresh(); return true;
 }
 
+function closeCamera() { stream?.getTracks().forEach((t) => t.stop()); stream = null; $('wrap').hidden = true; $('capture').hidden = true; $('start').hidden = false; }
 $('start').onclick = async () => {
   unlockAudio();
+  if (!navigator.mediaDevices?.getUserMedia) { status('The camera needs the https:// link. Use photos instead.'); return; }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
     $('video').srcObject = stream; $('wrap').hidden = false; $('start').hidden = true; $('capture').hidden = false;
-  } catch (e) { status('Camera blocked: ' + e.message + '. Use photos instead.'); }
+    $('selfies').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) { status(e.name === 'NotAllowedError' ? 'The camera is blocked. Allow it in your browser settings, or use photos instead.' : `Camera error: ${e.message}. Use photos instead.`); }
 };
 $('capture').onclick = async () => {
   const v = $('video'); if (!v.videoWidth) return;
   const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
-  $('capture').disabled = true; await addSample(c, `selfie ${descriptors.length + 1}`); $('capture').disabled = false;
+  $('wrap').classList.remove('snap'); void $('wrap').offsetWidth; $('wrap').classList.add('snap');
+  $('capture').disabled = true;
+  const ok = await addSample(c, `selfie ${samples.length + 1}`);
+  $('capture').disabled = false;
+  if (ok && samples.length === WANT) { closeCamera(); $('consent').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 };
 $('files').onchange = async (e) => {
-  for (const file of e.target.files) { try { await addSample(await imageFromFile(file), file.name); } catch (err) { status('Could not read ' + file.name); } }
+  for (const file of e.target.files) { try { await addSample(await imageFromFile(file), file.name); } catch { status('Could not read ' + file.name); } }
   e.target.value = '';
 };
 $('submit').onclick = async () => {
-  $('submit').disabled = true; status('Registering…');
+  $('submit').disabled = true; $('submit').textContent = 'Registering…';
   try {
-    const body = { name: $('name').value.trim(), handle: $('handle').value.trim().replace(/^@/, ''), blurb: $('blurb').value.trim(), linkedin: $('linkedin').value.trim(), consent: $('consent').checked, descriptors: descriptors.slice(0, 5), avatar, costume: costume.value };
+    const body = { name: $('name').value.trim(), handle: normGithub($('handle').value), blurb: $('blurb').value.trim(), linkedin: normLinkedin($('linkedin').value), consent: $('consent').checked, descriptors: samples.slice(0, 5).map((s) => s.embedding), avatar: samples[0]?.thumb || null, costume: costume.value };
     const { id, token } = await api('/api/attendee', { method: 'POST', body });
+    // this phone had a card: it is replaced, so the old one stops being findable (said in the notice at the top)
+    if (prev?.id && prev.id !== id) await Promise.race([api(`/api/attendee/${prev.id}`, { method: 'PATCH', body: { token: prev.token, consent: false } }).catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
     setMe({ id, token, name: body.name });
-    stream?.getTracks().forEach((t) => t.stop());
-    location.href = '/me';
-  } catch (e) { status('Failed: ' + e.message); $('submit').disabled = false; }
+    closeCamera();
+    location.href = '/me?welcome=1';
+  } catch (e) { status('Registration failed: ' + e.message); refresh(); }
 };
-if (getMe()) status('You are already registered on this phone. Registering again creates a new card.');
+if (prev) { $('already').hidden = false; $('already').innerHTML = `This phone is registered as <b>${esc(prev.name || 'you')}</b>. <a href="/me">Open my card</a>. Registering again replaces that card.`; }
+refresh();
 
 // Optional sign-in (buttons appear only when the server has provider credentials); a session pre-fills the form
 // and its profile photo becomes the face signature, so selfies are optional.
@@ -69,13 +95,13 @@ if (getMe()) status('You are already registered on this phone. Registering again
     if (!providers.length && !session) return;
     $('auth').hidden = false;
     const labels = { linkedin: 'LinkedIn', github: 'GitHub', google: 'Google', apple: 'Apple' };
-    const btn = (p, verb) => `<a href="/auth/${p}"><button class="secondary">${verb} ${labels[p] || p}</button></a>`;
+    const btn = (p, verb) => `<a class="btn secondary" href="/auth/${esc(p)}">${verb} ${esc(labels[p] || p)}</a>`;
     if (!session) {
-      $('auth-buttons').innerHTML = providers.map((p) => btn(p, 'Sign in with')).join('');
+      $('auth-buttons').innerHTML = providers.map((p) => btn(p, 'Sign in with')).join('') + '<div class="hint" style="text-align:center">Fills in your name and photo. Optional.</div>';
     } else {
       const more = providers.filter((p) => !session.linked.includes(p));
       $('auth-buttons').innerHTML = more.map((p) => btn(p, 'Also link')).join('');
-      $('auth-session').innerHTML = `Signed in as <b>${session.name || 'you'}</b> via ${session.linked.map((p) => labels[p] || p).join(' + ')}${session.avatar ? ` <img src="${session.avatar}" style="width:40px;height:40px;border-radius:50%;vertical-align:middle;margin-left:8px">` : ''}`;
+      $('auth-session').innerHTML = `${session.avatar ? `<img src="${esc(session.avatar)}" alt="" style="width:40px;height:40px;border-radius:50%;vertical-align:middle;margin-right:8px">` : ''}Signed in as <b>${esc(session.name || 'you')}</b> via ${session.linked.map((p) => esc(labels[p] || p)).join(' + ')}`;
       if (!$('name').value) $('name').value = session.name || '';
       if (!$('handle').value) $('handle').value = session.handle || '';
       refresh();
@@ -91,11 +117,6 @@ async function useProfilePhoto(src, from) {
   const k = Math.max(1, 400 / Math.min(img.naturalWidth, img.naturalHeight));
   const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
   const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, c.width, c.height);
-  const had = descriptors.length;
-  await addSample(c, `your ${from} photo`);
-  if (descriptors.length === had) { status(`No clear face in your ${from} photo. Take a selfie below instead.`); return; }
-  const heading = $('wrap')?.closest('.panel')?.querySelector('h2');
-  if (heading) heading.textContent = `Face signature: your ${from} photo`;
-  $('start').textContent = 'Add a selfie too (optional)';
+  if (!(await addSample(c, `your ${from} photo`, from))) { status(`No clear face in your ${from} photo. Take a selfie below instead.`); return; }
   status(`Using your ${from} photo as your face signature, no selfie needed. A selfie or two helps phones match you in a dark room.`);
 }

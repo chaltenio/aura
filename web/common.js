@@ -111,3 +111,13 @@ export function renderProfile(card) {
   if (links.length) bits.push(`<div class="p-links">${links.join(' · ')}</div>`);
   return bits.length ? `<div class="profile">${bits.join('')}</div>` : '';
 }
+
+/** What people type into the LinkedIn box -> the https://www.linkedin.com/... URL the server keeps ('' if it is not LinkedIn). */
+export function normLinkedin(v) {
+  let s = String(v || '').trim(); if (!s) return '';
+  if (/^[\w-]{3,100}$/.test(s)) return `https://www.linkedin.com/in/${s}`; // bare profile slug
+  s = s.replace(/^(https?:\/\/)?([a-z]{2,3}\.)?(www\.)?linkedin\.com/i, 'https://www.linkedin.com');
+  return /^https:\/\/www\.linkedin\.com\//.test(s) ? s : '';
+}
+/** "@octocat", "github.com/octocat" or a pasted profile URL -> "octocat". */
+export const normGithub = (v) => String(v || '').trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').replace(/[/?#].*$/, '');

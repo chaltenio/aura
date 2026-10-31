@@ -1,32 +1,37 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a10"><link rel="icon" href="/favicon.svg">
 <title>HAUNT · Register</title><link rel="stylesheet" href="/app.css"></head>
 <body>
-<h1><span class="ghost">👻</span> Be findable</h1>
-<p class="mute">Other players' phones will be able to recognize your face in this room, during this event. You can turn it off any time.</p>
+<header class="top"><a class="brand" href="/">👻 HAUNT</a><a class="top-link" href="/hunt">Hunt</a></header>
+<h1>Be findable</h1>
+<p class="mute">Phones in this room will recognize you tonight and show your name and GitHub. Takes a minute; switch it off any time.</p>
+<div class="panel notice" id="already" hidden></div>
 <div class="panel" id="auth" hidden><div id="auth-buttons"></div><div id="auth-session" class="mute"></div></div>
 <div class="panel">
-  <label for="name">Name</label><input id="name" type="text" autocomplete="name" placeholder="Ada Lovelace" maxlength="60">
-  <label for="handle">GitHub or LinkedIn handle (optional)</label><input id="handle" type="text" autocapitalize="none" placeholder="adalovelace" maxlength="60">
-  <label for="linkedin">LinkedIn URL (optional)</label><input id="linkedin" type="text" autocapitalize="none" placeholder="https://www.linkedin.com/in/you">
-  <label for="blurb">What are you building today? (optional)</label><textarea id="blurb" maxlength="200" placeholder="A haunted conference app"></textarea>
-  <div class="check"><input id="consent" type="checkbox"><label for="consent" style="margin:0">I agree that other attendees' phones can recognize my face during this event. Only a face signature (not photos) is uploaded, and I can delete it from <b>My card</b>.</label></div>
+  <label for="name">Your name</label><input id="name" type="text" autocomplete="name" placeholder="First and last name" maxlength="60" enterkeyhint="next">
+  <label for="handle">GitHub username <span class="opt">optional</span></label><input id="handle" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="octocat" maxlength="60" enterkeyhint="done">
+  <details class="more"><summary class="hint">Add LinkedIn and what you're building</summary>
+    <label for="linkedin">LinkedIn profile</label><input id="linkedin" type="url" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="linkedin.com/in/your-name">
+    <label for="blurb">What are you building today?</label><textarea id="blurb" maxlength="200" placeholder="One line people see on your card"></textarea>
+  </details>
 </div>
 <div class="panel">
-  <h2>Costume <span class="mute">(optional)</span></h2>
+  <h2>Costume <span class="opt">optional</span></h2>
   <p class="hint">What other players' phones draw on your face when they find you. Change it any time on My card.</p>
   <div id="costume"></div>
 </div>
-<div class="panel">
-  <h2>Face signature (3 selfies)</h2>
-  <div class="video-wrap mirror" id="wrap" hidden><video id="video" autoplay muted playsinline></video></div>
-  <button id="start">Start selfie camera</button>
-  <button id="capture" hidden>Capture (<span id="n">0</span>/3)</button>
-  <label for="files" class="hint">Or use photos of your face instead</label><input id="files" type="file" accept="image/*" multiple>
+<div class="panel" id="selfies">
+  <h2>Three selfies</h2>
+  <p class="hint">Good light, face the camera, turn your head a little between shots. Your selfies stay on this phone: only a face signature and a small thumbnail for your card are uploaded.</p>
+  <div class="video-wrap mirror selfie-cam" id="wrap" hidden><video id="video" autoplay muted playsinline></video></div>
   <div class="thumbs" id="thumbs"></div>
+  <button id="start">📷 Open selfie camera</button>
+  <button id="capture" hidden>Take selfie 1 of 3</button>
+  <label class="btn secondary" for="files">Use photos instead</label><input id="files" class="visually-hidden" type="file" accept="image/*" multiple>
   <div class="status" id="status">Loading face model…</div>
 </div>
+<div class="check consent-row"><input id="consent" type="checkbox"><label for="consent">I agree that phones at this event may recognize my face tonight. I can switch it off any time on <b>My card</b>.</label></div>
 <button id="submit" disabled>Register</button>
-<p class="hint"><a href="/">Back</a></p>
 <script type="module" src="/register.js"></script>
 </body></html>

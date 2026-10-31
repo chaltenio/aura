@@ -158,8 +158,10 @@ export async function imageFromFile(file) {
 }
 /** Small square face crop as a JPEG data URL (avatar). */
 export function cropFace(source, box, size = 128) {
-  const [x, y, w, h] = box; const s = Math.max(w, h) * 1.4; const cx = x + w / 2, cy = y + h / 2;
+  const [x, y, w, h] = box; const W = source.naturalWidth || source.videoWidth || source.width, H = source.naturalHeight || source.videoHeight || source.height;
+  const s = Math.min(Math.max(w, h) * 1.4, W, H); // the square stays inside the image (no black bar on avatars of faces near an edge)
+  const sx = Math.max(0, Math.min(x + w / 2 - s / 2, W - s)), sy = Math.max(0, Math.min(y + h / 2 - s / 2, H - s));
   const c = document.createElement('canvas'); c.width = size; c.height = size;
-  c.getContext('2d').drawImage(source, cx - s / 2, cy - s / 2, s, s, 0, 0, size, size);
+  c.getContext('2d').drawImage(source, sx, sy, s, s, 0, 0, size, size);
   return c.toDataURL('image/jpeg', 0.8);
 }
