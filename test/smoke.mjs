@@ -27,6 +27,10 @@ try {
   for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/face.js', '/common.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
     const r = await fetch(BASE + p); check(r.ok, `GET ${p} -> ${r.status}`);
   }
+  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate']) { // a repeated id makes $('x') grab the wrong element
+    const ids = [...(await (await fetch(BASE + p)).text()).matchAll(/[\s<]id="([^"]+)"/g)].map((m) => m[1]);
+    const dup = ids.filter((x, i) => ids.indexOf(x) !== i); check(!dup.length, `${p} repeats ids: ${dup.join(', ')}`);
+  }
 
   const ver = (await json('/api/version')).data; check(ver.version && ver.attendees === 0, '/api/version reports version and counts');
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: false, descriptors: [vec()] } })).status === 400, 'consent=false should be rejected');
