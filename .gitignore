@@ -44,3 +44,9 @@ data/
 
 # team bus local state
 .bus/
+
+# secrets: only secrets/*.enc.env (SOPS-encrypted) may be committed
+*.key
+secrets/*.env
+!secrets/*.enc.env
+age-key*.txt

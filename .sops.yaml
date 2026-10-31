@@ -1,0 +1,5 @@
+# SOPS config: which age public keys can decrypt the committed secrets.
+# One line per team, comma-separated keys. Add a teammate with: scripts/secrets.sh add-member <age1...>
+creation_rules:
+  - path_regex: secrets/.*\.enc\.env$
+    age: "age17fsdjuq53w6hk8w6atapka7hrp9ce7ddrn2mtsea4wshz4nr8dhqt77qwf"
