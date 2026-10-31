@@ -1,5 +1,6 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
 import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, esc, renderProfile } from '/common.js';
+import { costumeLayer, costumeTitle, COSTUMES } from '/costume.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };
@@ -8,6 +9,7 @@ let engine = null, index = buildIndex([]), stream = null, running = false;
 const votes = new Map(); // attendeeId -> consecutive frames
 let shown = null, shownSim = 0, lastShownAt = 0;
 const me = getMe();
+const costumes = costumeLayer($('wrap'), { threshold: THRESHOLD }); // draws a recognised person's costume over the camera
 
 async function refreshGallery() { try { index = buildIndex(await api('/api/gallery')); } catch {} }
 await refreshGallery();
@@ -17,7 +19,8 @@ loadEngine({ video: true, onProgress: status }).then((h) => { engine = h; status
 
 let shownId = null, hauntSent = false;
 function renderCard(att, sim) {
-  $('c-name').textContent = att.name; $('c-handle').textContent = att.handle ? '@' + att.handle : ''; $('c-blurb').textContent = att.blurb || '';
+  const title = costumeTitle(att); // "🧛 Count Ada" when they picked a costume; their real name moves to the handle line
+  $('c-name').textContent = title || att.name; $('c-handle').textContent = [title && att.name, att.handle && '@' + att.handle].filter(Boolean).join(' · '); $('c-blurb').textContent = att.blurb || '';
   $('c-sim').textContent = `match ${(sim * 100).toFixed(0)}%`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
   $('c-profile').innerHTML = renderProfile(att);
@@ -56,6 +59,7 @@ export async function processFrame(source) {
   }
   if (shown && Date.now() - lastShownAt > 8000 && !votes.has(shown.id)) { $('sheet').classList.remove('show'); shown = null; shownId = null; }
   draw(source, results);
+  costumes.update(source, results, (id) => (votes.get(id) || 0) >= VOTES_NEEDED);
   return results;
 }
 
@@ -69,9 +73,11 @@ function draw(source, results) {
   for (const r of results) {
     const [x, y, w, h] = r.box;
     const matched = r.attendee && r.similarity >= THRESHOLD; const maybe = r.attendee && r.similarity >= ABSTAIN;
-    ctx.strokeStyle = matched ? '#7CFF6B' : maybe ? '#ffb347' : '#9a93ad'; ctx.strokeRect(x, y, w, h);
+    const costumed = matched && COSTUMES[r.attendee.costume]; // a costume replaces the box, and the label moves under the chin, clear of hats and horns
+    ctx.strokeStyle = matched ? '#7CFF6B' : maybe ? '#ffb347' : '#9a93ad'; if (!costumed) ctx.strokeRect(x, y, w, h);
     const label = matched ? `${r.attendee.name} ${(r.similarity * 100).toFixed(0)}%` : maybe ? `? ${(r.similarity * 100).toFixed(0)}%` : 'unknown';
-    ctx.fillStyle = '#000a'; ctx.fillRect(x, y - 24, ctx.measureText(label).width + 10, 24); ctx.fillStyle = ctx.strokeStyle; ctx.fillText(label, x + 5, y - 6);
+    const ly = costumed ? y + h + 30 : y;
+    ctx.fillStyle = '#000a'; ctx.fillRect(x, ly - 24, ctx.measureText(label).width + 10, 24); ctx.fillStyle = ctx.strokeStyle; ctx.fillText(label, x + 5, ly - 6);
   }
 }
 
