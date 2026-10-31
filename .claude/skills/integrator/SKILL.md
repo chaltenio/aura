@@ -31,7 +31,7 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
      echo "$b ahead=$(git rev-list --count origin/main..$b) last=$(git log -1 --format=%cr $b) diverged=$(git log -1 --format=%cr $(git merge-base origin/main $b))"
    done
    ```
-   A branch that diverged from main more than ~45 minutes ago, or whose last commit is older than 45 minutes with unmerged work, gets a nudge on the bus: `scripts/bus.sh post "@<owner> <branch> has been away from main for <time>; run /merge when the next step works"`. Owner = the `<name>/` prefix. Two branches touching the same file (`git diff --name-only origin/main...<b>` overlaps) get named together so the first to `/merge` warns the second.
+   A branch that diverged from main more than ~45 minutes ago, or whose last commit is older than 45 minutes with unmerged work, gets a nudge on the bus: `scripts/bus.sh post "@<owner> <branch> has been away from main for <time>; run scripts/ready.sh when the next step works"`. Owner = the `<name>/` prefix. Two branches touching the same file (`git diff --name-only origin/main...<b>` overlaps) get named together so the first to `/merge` warns the second.
 
 3. **Bring the integrator worktree up to date** (never touch the human's working tree):
    ```bash
@@ -99,7 +99,7 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 ## Escalate, do not fix
 
 - Test failing on main for two passes: say "main is red since HH:MM, <name>'s commit <sha>; everyone pull but do not push until green" and ping the author.
-- Two people editing the same file: ask one to stop and the other to push first, or ask the second to rebase now.
+- Two people editing the same file: ask one to stop and the other to push first, or ask the second to run `scripts/sync.sh` now.
 - A PR is landed only when its branch has a `[READY]` line. An open PR without one: ask the author to run `scripts/ready.sh` when it is done. A PR that conflicts with main: ask the author to run `scripts/sync.sh` (it merges main in), never to rebase.
 - Anything you would need to change in `web/` or `server/` to resolve: write the exact change in chat and let the owner apply it.
 
