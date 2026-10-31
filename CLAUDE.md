@@ -3,6 +3,9 @@
 Point your phone at someone in the room and know who they are. Opt-in, on-device face-to-profile for events.
 Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing what).
 
+
+Open Claude with `npm run go` (submits the start prompt for you; the interview, claim and branch happen before you type anything).
+
 ## Where to find work
 - **IDEAS.md section 3** ("Ideas that fit and are free for another teammate to take"): the backlog of pickable, independent features, each with effort and sponsor track. Start there.
 - **TODO.md** Now/Next: what is claimed and by whom; Done: what landed. STATUS at the top is the one-paragraph truth.

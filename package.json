@@ -8,7 +8,8 @@
     "start": "node --env-file-if-exists=.env server/index.js",
     "dev": "node --watch --env-file-if-exists=.env server/index.js",
     "test": "node test/smoke.mjs",
-    "tunnel": "cloudflared tunnel --url http://localhost:3000"
+    "tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "go": "claude \"Start my session: run /start\""
   },
   "engines": { "node": ">=22" },
   "dependencies": {
