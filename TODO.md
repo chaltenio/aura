@@ -22,6 +22,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 27 | LinkedIn: sign-in live on prod (app HAUNT, redirect `https://aura-haunt.fly.dev/auth/linkedin/callback`, `LINKEDIN_CLIENT_ID/SECRET` in secrets/prod.enc.env and on Fly); signed in, the profile photo is the face signature and selfies are optional | Matt | [ ] |
 | 26 | UI/UX pass: drive every page in an emulated phone (iPhone + Pixel, fake camera) and fix the clunky parts: register, hunt, screen, calibrate, index, app.css | Matt | [ ] |
 | 28 | Deploy version: the home page footer shows `v<N> · <sha> · deployed <time>`; N goes up by one on every deploy (counter in `data/version.json`, bumped at boot when the deployed image changes); `/api/version` gains `deploy`, `deployedAt` | Matt | [x] |
+| 30 | Instant profile updates: a `/me` edit (costume, GitHub handle, LinkedIn, findable) shows on every open phone at once. The server pushes the changed card (`attendee_changed`, or `attendee_gone {id}` on opt-out) instead of making every `/hunt` refetch the whole gallery; `/hunt` redraws the costume on the next frame and re-renders an open card; `/me` shows the save at once and the GitHub profile arrives by push | Matt | [ ] |
 
 ## Next
 
