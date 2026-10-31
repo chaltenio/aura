@@ -2,11 +2,20 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
+        "matcher": "startup|resume|clear",
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 12 messages; post with scripts/bus.sh post|claim|ask):' && scripts/bus.sh read 12 2>/dev/null; echo; echo 'TODO.md STATUS:'; sed -n '/^## STATUS/,/^## Now/p' TODO.md | sed '1d;$d'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 12; post with scripts/bus.sh post|claim|ask):' && scripts/bus.sh read 12 2>/dev/null; echo; echo 'TODO.md STATUS + Now:'; sed -n '/^## STATUS/,/^## Next/p' TODO.md | sed '1d;$d'; echo; echo 'Branches in flight (unmerged into origin/main):'; for b in $(git branch -r --no-merged origin/main 2>/dev/null | grep -v HEAD); do echo \"  $b  ahead=$(git rev-list --count origin/main..$b)  last=$(git log -1 --format=%cr $b)\"; done; echo; echo 'Project convention for this session: this Claude is the steering agent for the teammate who just came online. In a fresh session (startup, resume, clear) the first action is the /start conversation from .claude/skills/start/SKILL.md: a five-line greeting built from the state above, then one question, what do you want to build, with the top three unclaimed TODO items as choices. If the first user message is already a concrete task, the greeting is skipped, but the task is still claimed on the bus and given its own branch before any file is edited. Nobody edits on main.'"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 6):' && scripts/bus.sh read 6 2>/dev/null | head -n 6; echo 'Branch:' $(git branch --show-current)"
           }
         ]
       }
