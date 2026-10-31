@@ -1,7 +1,7 @@
 // Public profile enrichment from GitHub (by handle). Cached on the attendee record, refreshed hourly.
 // Uses GITHUB_TOKEN when present (5000 req/h instead of 60). Never blocks registration; the card route awaits it briefly.
 const TTL_MS = 60 * 60 * 1000;
-const inflight = new Map();
+const inflight = new Map(); // attendeeId -> { handle, done }
 
 const gh = async (path) => {
   const headers = { accept: 'application/vnd.github+json', 'user-agent': 'haunt' };
@@ -32,12 +32,29 @@ export async function fetchGithubProfile(handle) {
   };
 }
 
-/** Ensure a.profile is fresh. Resolves quickly if cached; otherwise fetches (deduplicated) within `waitMs`. */
-export async function ensureProfile(a, save, waitMs = 4000) {
+/** Ensure a.profile is fresh. A cached profile, even a stale one, comes back at once (a stale one is refreshed in the
+ *  background); with nothing cached it waits up to `waitMs` for the lookup. One lookup per person at a time, for their
+ *  current handle: a lookup for a handle they have since changed never lands on the card. `onUpdate(a)` runs when a
+ *  lookup changes the card (or ends one that was loading), so the caller can save and push it. */
+export async function ensureProfile(a, onUpdate, waitMs = 4000) {
   if (!a?.handle || process.env.NO_PROFILE) return a?.profile || null;
   if (a.profile && Date.now() - (a.profile.fetchedAt || 0) < TTL_MS) return a.profile;
-  if (!inflight.has(a.id)) {
-    inflight.set(a.id, fetchGithubProfile(a.handle).then((p) => { if (p) { a.profile = p; save(); } return p; }).catch((e) => { a.profile = a.profile || { source: 'github', error: e.message, fetchedAt: Date.now() }; save(); return a.profile; }).finally(() => inflight.delete(a.id)));
+  let job = inflight.get(a.id);
+  if (!job || job.handle !== a.handle) {
+    const handle = a.handle, before = a.profile;
+    job = { handle };
+    job.done = fetchGithubProfile(handle)
+      .catch((e) => ({ source: 'github', error: e.message, fetchedAt: Date.now() }))
+      .then((p) => { if (p && a.handle === handle && !(p.error && a.profile && !a.profile.error)) a.profile = p; return a.profile; }) // an error never replaces a good profile
+      .finally(() => {
+        if (inflight.get(a.id) === job) inflight.delete(a.id);
+        if (a.profile !== before || !before) { try { onUpdate?.(a); } catch (e) { console.warn('profile update:', e.message); } } // nobody may await this: never reject
+      });
+    inflight.set(a.id, job);
   }
-  return Promise.race([inflight.get(a.id), new Promise((r) => setTimeout(() => r(a.profile || null), waitMs))]);
+  if (a.profile) return a.profile;
+  return Promise.race([job.done, new Promise((r) => setTimeout(() => r(a.profile || null), waitMs))]);
 }
+
+/** True while a GitHub lookup runs for this person's current handle and no profile is cached yet. */
+export const profileLoading = (a) => !!a?.handle && !a.profile && inflight.get(a.id)?.handle === a.handle;

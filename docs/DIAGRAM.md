@@ -13,7 +13,7 @@ from a Cloudflare quick tunnel in front of `localhost:3000`.
 > optional 128 px avatar crop the attendee chose to upload, and only after the consent box is
 > ticked. The server never runs a face model, never sees a frame, and `GET /api/gallery` returns
 > descriptors for consenting attendees only. Flipping consent off on `/me` removes you from every
-> phone's gallery on the next `gallery_changed` push. No face ever reaches a hosted LLM.
+> phone at once (an `attendee_gone` push carrying only your id). No face ever reaches a hosted LLM.
 
 ## 1. System diagram
 
@@ -88,8 +88,8 @@ flowchart LR
   gh["GitHub release facex-engine/facex v1.0.0<br/>edgeface_xs_fp32.bin, det_500m_int8.bin"]
   gh -. "ensureWeights() on first start" .-> stat
 
-  wsrv -. "push: hello, gallery_changed, haunted" .-> common
-  wsrv -. "push: hello, gallery_changed, joined, event" .-> screen
+  wsrv -. "push: hello, gallery_changed, attendee_changed, attendee_gone, haunted" .-> common
+  wsrv -. "push: hello, gallery_changed, attendee_gone, joined, event" .-> screen
 
   style engine stroke:#7CFF6B,stroke-width:3px,stroke-dasharray:6 4
   style phones stroke:#7CFF6B,stroke-width:2px
@@ -162,6 +162,13 @@ sequenceDiagram
   B->>S: GET /api/attendee/aliceId (lazy card refresh)
   S-->>B: public card: name, handle, blurb, avatar, hauntedCount, huntCount
 
+  Note over A,T: Profile edit (Alice picks a new costume on /me while Bob points at her)
+  A->>S: PATCH /api/attendee/aliceId {token, costume: witch} (edits go out one at a time, in tap order)
+  S->>D: a.costume = witch, save()
+  S->>B: ws attendee_changed {attendee: Alice card without avatar} (broadcast, no gallery refetch)
+  S-->>A: public card
+  B->>B: Object.assign the card onto Alice in the index: next frame draws the witch with its sting, the open card re-renders
+
   Note over A,T: Haunt (Bob taps the button)
   B->>S: POST /api/haunt {actorId: bobId, token, targetId: aliceId, similarity}
   S->>S: check token, target consent, not self. No rate limit, so a repeat haunt goes through too
@@ -223,7 +230,7 @@ from `web/` with the `.html` extension implied, so `/hunt` serves `web/hunt.html
 | GET | `/api/gallery` | none | `[{id, name, descriptors}]` | Consenting attendees only. This is the matching set `/hunt` loads. |
 | GET | `/api/attendee/:id` | none | public card | `id, name, handle, blurb, linkedin, avatar, consent, hauntedCount, huntCount`. Used by `/hunt` to fill the card sheet. |
 | GET | `/api/me/:id` | `?token=` | `{me, received[], given[]}` | 403 if the token does not match. Each event is enriched with the other party's public card, newest first. |
-| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?}` | public card | Kill switch. Broadcasts `gallery_changed` so every `/hunt` refetches. "Forget me" on `/me` sends `consent: false` then clears local storage. |
+| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` | public card | Profile edits and the kill switch. Pushes `attendee_changed {attendee}` to every socket, or `attendee_gone {id}` when the person is not findable; turning consent back on broadcasts `gallery_changed` instead. A changed `handle` starts a GitHub lookup that pushes the card again when it lands. "Forget me" on `/me` sends `consent: false` then clears local storage. |
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity}` | `{ok: true, card}` | 403 bad token, 404 target missing or hidden, 400 self-haunt. No rate limit: a repeat haunt on the same person is accepted like the first. Writes the event, pushes `haunted` to the target and `event` to screens. |
 | GET | `/api/events` | `?limit=` (default 50, max 500) | `{events[], attendees[]}` | Newest first, each with actor and target cards, plus the consenting attendee cards. Bootstraps `/screen`. |
 | WS | `/ws` | `?attendee=<id>` and/or `?screen=1` | server to client only | Client messages are ignored. See the table below. |
@@ -236,8 +243,10 @@ registered; `/screen` connects with `screen=1`.
 
 | Type | Sent to | Trigger | Payload | Client reaction |
 |---|---|---|---|---|
-| `hello` | the socket that just connected | connection | `{attendees: n}` consenting count | none today |
-| `gallery_changed` | every open socket | `POST /api/attendee`, `PATCH /api/attendee/:id` | none | `/hunt` refetches `/api/gallery`, `/screen` reloads `/api/events` |
+| `hello` | the socket that just connected | connection | `{attendees: n}` consenting count | `/hunt` refetches `/api/gallery` on every `hello` after the first (a reconnect may have missed pushes) |
+| `gallery_changed` | every open socket | `POST /api/attendee`, a PATCH that turns consent back on, admin block / unblock / delete | none | `/hunt` refetches `/api/gallery`, `/screen` reloads `/api/events` |
+| `attendee_changed` | every open socket | `PATCH /api/attendee/:id` on a findable person, a GitHub lookup landing | `{attendee: public card without avatar}` | `/hunt` assigns it onto that person in its index (costume on the next frame, an open card re-renders); `/me` updates your card and the matching connection row |
+| `attendee_gone` | every open socket | `PATCH /api/attendee/:id` on someone not findable (opted out or blocked) | `{id}` only, never the card | `/hunt` drops that face and closes their card; `/me` drops the connection row; `/screen` reloads `/api/events` |
 | `haunted` | every socket of the target attendee | accepted `POST /api/haunt` | `{by: actor card, at}` | `hauntedAlert()`: shriek, vibrate, flash, toast; `/me` re-renders |
 | `joined` | screens | `POST /api/attendee` | `{attendee: card}` | `/screen` reloads `/api/events` |
 | `event` | screens | accepted `POST /api/haunt` | `{event: {..., actor, target}}` | `/screen` prepends it to the feed and recounts |

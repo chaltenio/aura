@@ -160,6 +160,34 @@ try {
     check((await patch('<b>x</b>')).costume === null && (await patch('witch')).costume === 'witch' && (await patch('plain')).costume === null, 'costume: junk and plain clear it');
     check((await json(`/api/attendee/${vi.id}`, { method: 'PATCH', body: { token: 'nope', costume: 'ghost' } })).status === 403, 'costume: PATCH needs the token');
   }
+  { // instant profile (#30): a PATCH pushes the changed card to every socket, so /hunt patches it in place (no gallery refetch);
+    // opting out pushes only the id; opting back in asks for a gallery refetch (the descriptors come back)
+    const hunter = new WebSocket(`ws://localhost:${PORT}/ws`), inbox = [];
+    hunter.addEventListener('message', (e) => inbox.push(JSON.parse(e.data)));
+    await new Promise((res, rej) => { hunter.addEventListener('open', res); hunter.addEventListener('error', rej); });
+    const next = async (pred, ms = 1500) => { for (const t = Date.now(); Date.now() - t < ms; await new Promise((r) => setTimeout(r, 5))) { const i = inbox.findIndex(pred); if (i >= 0) return inbox.splice(i, 1)[0]; } return null; };
+    const pia = (await json('/api/attendee', { method: 'POST', body: { name: 'Pia', handle: 'pia', consent: true, descriptors: [vec()], costume: 'vampire', avatar: 'data:image/jpeg;base64,AAAA' } })).data;
+    await next((m) => m.type === 'gallery_changed'); inbox.length = 0; // the join itself still refetches: hunters need the new face
+    const edit = async (body) => { inbox.length = 0; const t = Date.now(); const r = await json(`/api/attendee/${pia.id}`, { method: 'PATCH', body: { token: pia.token, ...body } }); return { r, t }; };
+    const changed = (m) => m.type === 'attendee_changed' && m.attendee?.id === pia.id;
+    let { r, t } = await edit({ costume: 'witch' });
+    const c1 = await next(changed);
+    check(r.status === 200 && c1?.attendee.costume === 'witch' && c1.attendee.name === 'Pia' && Date.now() - t < 1500, 'instant: a costume PATCH pushes attendee_changed with the new costume');
+    check(c1 && !('descriptors' in c1.attendee) && !('token' in c1.attendee) && !('avatar' in c1.attendee), 'instant: the pushed card has no descriptors, token or avatar');
+    await new Promise((res) => setTimeout(res, 100));
+    check(!inbox.some((m) => m.type === 'gallery_changed'), 'instant: a profile edit no longer makes every /hunt refetch the gallery');
+    ({ r } = await edit({ blurb: 'ghosts', linkedin: 'https://www.linkedin.com/in/pia', costume: 'plain' }));
+    const c2 = await next(changed);
+    check(c2?.attendee.blurb === 'ghosts' && c2.attendee.linkedin === 'https://www.linkedin.com/in/pia' && c2.attendee.costume === null && c2.attendee.profileLoading === false, 'instant: blurb, LinkedIn and costume off arrive in one push (profileLoading always a boolean)');
+    ({ r } = await edit({ consent: false }));
+    const gone = await next((m) => m.type === 'attendee_gone' && m.id === pia.id);
+    check(gone && Object.keys(gone).sort().join() === 'id,type' && !inbox.some(changed), 'instant: opting out pushes attendee_gone with the id only, never the card');
+    ({ r } = await edit({ costume: 'ghost' }));
+    check(await next((m) => m.type === 'attendee_gone' && m.id === pia.id) && !inbox.some(changed), 'instant: an opted-out edit still never pushes the card');
+    ({ r } = await edit({ consent: true }));
+    check(await next((m) => m.type === 'gallery_changed') && (await json('/api/gallery')).data.some((x) => x.id === pia.id && x.costume === 'ghost'), 'instant: opting back in asks phones to refetch the gallery (face descriptors back)');
+    hunter.close();
+  }
   ws.close();
 
   // admin: auth, block/allow, direct + group message push, events
@@ -191,4 +219,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, static routes, Base44 mirror CORS + sign-in handoff + build)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, static routes, Base44 mirror CORS + sign-in handoff + build)');

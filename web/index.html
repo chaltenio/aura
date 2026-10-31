@@ -1,18 +1,29 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a10"><link rel="icon" href="/favicon.svg">
 <title>HAUNT</title><link rel="stylesheet" href="/app.css"></head>
 <body>
-<h1><span class="ghost">👻</span> HAUNT</h1>
-<p>Point your phone at someone in the room and know who they are. Opt-in only. Faces never leave your phone.</p>
+<header class="hero">
+  <div class="hero-ghost">👻</div>
+  <h1>HAUNT</h1>
+  <p>Point your phone at someone in the room and know who they are.</p>
+  <p class="mute">Opt-in only. Faces never leave your phone.</p>
+</header>
+<nav id="actions">
+  <a class="btn" id="a-register" href="/register">Register (be findable)</a>
+  <a class="btn secondary" id="a-hunt" href="/hunt">Hunt</a>
+  <a class="btn secondary" id="a-me" href="/me">My card</a>
+</nav>
 <div class="panel">
-  <a href="/register"><button>Register (be findable)</button></a>
-  <a href="/hunt"><button class="secondary">Hunt</button></a>
-  <a href="/me"><button class="secondary">My card</button></a>
-  <a href="/screen" class="hint">Big screen view</a>
+  <ol class="steps">
+    <li><span><b>Register</b> with three selfies. About a minute.</span></li>
+    <li><span><b>Hunt</b>: point your camera at someone and their card pops up.</span></li>
+    <li><span><b>Haunt</b> them: their phone shrieks, and they can haunt you back.</span></li>
+  </ol>
 </div>
-<div class="panel qr" id="qr"></div>
-<p class="hint">Scan the QR with another phone to join.</p>
-<footer class="hint" id="version" style="text-align:center;margin-top:32px"></footer>
+<div class="panel qr-panel"><div class="qr" id="qr"></div><p class="hint">Show this to a friend so they can join</p></div>
+<p class="hint foot"><a href="/screen">Big screen view</a></p>
+<footer class="hint" id="version" style="text-align:center;margin-top:16px"></footer>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>const q = qrcode(0, 'M'); q.addData(location.origin + '/register'); q.make(); document.getElementById('qr').innerHTML = q.createSvgTag({ cellSize: 6, margin: 2 });</script>
 <script>// deploy number: one more on every deploy (server/version.js)
@@ -20,4 +31,14 @@ fetch((window.HAUNT_API || '') + '/api/version', { cache: 'no-store' }).then((r)
   const when = v.deployedAt ? new Date(v.deployedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   document.getElementById('version').textContent = (v.deploy ? `v${v.deploy} · ${v.version}${when ? ` · deployed ${when}` : ''}` : 'dev build') + (window.HAUNT_MIRROR ? ` · ${window.HAUNT_MIRROR}` : '');
 }).catch(() => {});</script>
+<script>// already registered on this phone: lead with Hunt and your card; registering again would replace your card
+try {
+  const me = JSON.parse(localStorage.getItem('haunt.me') || 'null');
+  if (me) {
+    const hunt = document.getElementById('a-hunt'), card = document.getElementById('a-me');
+    hunt.className = 'btn'; hunt.textContent = '👻 Hunt';
+    card.textContent = me.name ? `My card (${me.name})` : 'My card';
+    document.getElementById('a-register').hidden = true;
+  }
+} catch {}</script>
 </body></html>

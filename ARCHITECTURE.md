@@ -164,8 +164,9 @@ CREATE TABLE events (
 
 Consent is a column, not a filter in the client: the gallery endpoint only ever
 returns rows with `consent = 1`, and flipping it to 0 removes you from every
-phone's gallery on the next refresh (clients re-fetch the gallery every 30 s and
-on a `gallery_changed` socket message).
+phone at once: the server pushes `attendee_gone {id}` and every `/hunt` drops that
+face from its gallery (phones also refetch the gallery on `gallery_changed` and
+whenever their socket reconnects).
 
 ## 3. API
 
@@ -176,23 +177,26 @@ on a `gallery_changed` socket message).
 | POST | `/api/session/logout` | Clears the session cookie |
 | GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` (cookie or `x-haunt-session` header) |
 | POST | `/api/attendee` | `{name, handle?, blurb?, linkedin?, consent: true, descriptors: [[...]], avatar?, costume?}` -> `{id, token}`. A signed-in session fills provider, name, handle, avatar. 400 unless `consent === true` and every descriptor has at least 128 finite numbers. `costume` is a short lowercase id (`web/costume.js`); anything else, or `'plain'`, stores `null` |
-| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; broadcasts `gallery_changed` |
+| PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; a changed `handle` starts a GitHub lookup (the same handle keeps its profile). Every edit reaches every socket at once (#30): `attendee_changed` with the card, or `attendee_gone {id}` when the person is not findable (opted out or blocked; never their card). Turning consent back on broadcasts `gallery_changed` instead, because phones need the face descriptors again |
 | GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (the matching set `/hunt` loads; `costume` so it can draw it the moment a face matches). Cards and avatars come from `/api/attendee/:id` |
-| GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, costume, hauntedCount, huntCount`. 404 if unknown |
+| GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, costume, hauntedCount, huntCount`, plus `profileLoading` (true only while a GitHub lookup runs for a handle with nothing cached; the card is pushed again when it lands). A cached profile comes back at once even when over an hour old; it is refreshed in the background and pushed. 404 if unknown |
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
 | GET | `/api/version` | `{version, deploy, deployedAt, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`); `deploy` = the deploy number, one more on every deploy (a new Fly image, `FLY_IMAGE_REF`; off Fly a new `APP_VERSION`), kept with `deployedAt` (ms, when that deploy first booted) in `data/version.json`, both `null` on a dev build; boot time; counts. The home page footer shows `v<deploy> · <version> · deployed <time>`. Used by deploy and integrator checks |
 | GET | `/admin` | Admin page; asks for the token, calls the routes below |
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
-| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
+| WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
 
 Every `/api` route answers CORS for the `FRONTEND_ORIGINS` origins (preflight 204, methods GET POST PATCH DELETE,
 headers `content-type`, `x-haunt-session`, `x-admin-token`); `/ws` accepts any origin, as before.
 
 No haunt rate limit: a repeat `POST /api/haunt` on the same person is written and
 pushed like the first (no 429). `/hunt` still sends one haunt per card: the button
-re-arms only after the card closes and that person is found again.
+re-arms only after the card closes and that person is found again. A closed card
+(Close, or 3.5 s after a sent haunt) stays closed while that person is still in
+frame; it re-arms once they have been out of frame for 2.5 s, or when the hunter
+taps the camera. An open card stays on its person until they leave the frame.
 
 ## 4. Flows
 
@@ -210,12 +214,17 @@ re-arms only after the card closes and that person is found again.
    descriptor from the downloaded avatar on the server side? **No**: keep all
    embedding on the client so the server never runs a face model. The client
    fetches the avatar, embeds it, and sends both descriptors.
-5. POST attendee. Land on `/me` with your card and a "Go hunt" button.
+5. POST attendee. Land on `/me?welcome=1` with your card and a "Go hunt" button.
+   Registering again on a phone that already has a card replaces it: the old card
+   is switched off (`PATCH consent:false` with the old token), so one face never
+   has two findable cards.
 
 **Hunt**
 
 1. `/hunt` opens the rear camera at 640x480 (enough for faces at 2 to 3 m).
-2. Fetch gallery once, subscribe to `gallery_changed`.
+2. Fetch gallery once; refetch it on `gallery_changed` and on a reconnect. On
+   `attendee_changed` patch that person in place (a new costume is drawn on the
+   next frame, an open card re-renders); on `attendee_gone` drop their face.
 3. Detect loop at 3 to 5 fps. On match above threshold for 3 consecutive frames
    (debounce), show the card overlay and a "Haunt" button.
 4. Haunt -> POST, target's phone receives `haunted`: plays the shriek (Web Audio,
@@ -225,8 +234,8 @@ re-arms only after the card closes and that person is found again.
 
 **Opt out**
 
-`/me` -> toggle off -> PATCH -> server broadcasts `gallery_changed` -> gone from
-every phone within one refresh.
+`/me` -> toggle off -> PATCH -> server broadcasts `attendee_gone {id}` -> every
+phone drops that face at once (an open card closes) and `/screen` recounts.
 
 ## 5. Privacy posture (say this out loud in the pitch)
 
