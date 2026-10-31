@@ -10,7 +10,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
@@ -24,7 +24,7 @@ try {
   for (let i = 0; i < 100 && !up; i++) { try { up = (await fetch(BASE + '/api/gallery')).ok; } catch {} if (!up) await new Promise((r) => setTimeout(r, 200)); }
   check(up, 'server did not boot: ' + serverLog);
 
-  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/face.js', '/common.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
+  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/admin', '/face.js', '/common.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
     const r = await fetch(BASE + p); check(r.ok, `GET ${p} -> ${r.status}`);
   }
   for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate']) { // a repeated id makes $('x') grab the wrong element
@@ -109,6 +109,32 @@ try {
     cyWs.close();
   }
   ws.close();
+
+  // admin: auth, block/allow, direct + group message push, events
+  const adm = (path, method = 'GET', body) => fetch(BASE + '/api/admin' + path, { method, headers: { 'x-admin-token': 'test-admin', ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, data: await r.json().catch(() => ({})) }));
+  check((await fetch(BASE + '/api/admin/users')).status === 401, 'admin without token -> 401');
+  check((await fetch(BASE + '/api/admin/users', { headers: { 'x-admin-token': 'wrong' } })).status === 401, 'admin wrong token -> 401');
+  check((await fetch(BASE + '/admin')).ok, 'GET /admin page');
+  const au = (await adm('/users')).data;
+  check(au.length >= 2 && au.some((x) => x.id === a.id) && au.every((x) => !('token' in x) && !('descriptors' in x)), 'admin users list hides tokens/descriptors');
+  const ws2 = new WebSocket(`ws://localhost:${PORT}/ws?attendee=${a.id}`);
+  const gotMsg = new Promise((res) => ws2.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.type === 'admin_message') res(m); }));
+  await new Promise((res, rej) => { ws2.addEventListener('open', res); ws2.addEventListener('error', rej); });
+  const dm = await adm('/messages', 'POST', { to: a.id, text: 'hello Ada' });
+  check(dm.data.delivered === 1, 'direct message delivered to online attendee');
+  check((await Promise.race([gotMsg, new Promise((r) => setTimeout(() => r(null), 3000))]))?.text === 'hello Ada', 'attendee socket receives admin_message');
+  check((await adm('/messages', 'POST', { group: 'all', text: 'hi all' })).data.recipients === au.length, 'group message counts recipients');
+  check((await adm('/messages', 'POST', { group: 'nope', text: 'x' })).status === 400, 'bad group -> 400');
+  check((await adm(`/users/${a.id}`, 'PATCH', { blocked: true })).data.blocked === true, 'admin can disallow');
+  check(!(await json('/api/gallery')).data.some((x) => x.id === a.id), 'blocked attendee leaves the gallery');
+  check((await json('/api/haunt', { method: 'POST', body: { actorId: a.id, token: a.token, targetId: b.id } })).status === 403, 'blocked attendee cannot haunt');
+  await adm(`/users/${a.id}`, 'PATCH', { blocked: false });
+  const m1 = (await adm('/events', 'POST', { name: 'Night 1' })).data; const m2 = (await adm('/events', 'POST', { name: 'Night 2' })).data;
+  await adm(`/events/${m1.id}/start`, 'POST'); await adm(`/events/${m2.id}/start`, 'POST');
+  const evs = (await adm('/events')).data;
+  check(evs.filter((x) => x.active).length === 1 && evs.find((x) => x.active).id === m2.id, 'only one active event');
+  check((await adm(`/users/${b.id}`, 'DELETE')).status === 200 && !(await adm('/users')).data.some((x) => x.id === b.id), 'admin can delete an attendee');
+  ws2.close();
 } catch (e) { fails.push('exception: ' + (e.stack || e)); }
 finally { server.kill(); }
 

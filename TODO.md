@@ -26,6 +26,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 8 | GitHub OAuth, then LinkedIn OIDC (store picture bytes, not the URL) on `/register` | main session (GitHub/LinkedIn), Chris (Google/Apple) | [x] |
 | 9 | Decide the second track: **Fetch.ai, as the Scout** (IDEAS.md 2b: find people by face not name, clue nudge, hunt confirms, post-haunt rating). TrueForge dropped: needs venue photos + two measured runs. | tarecq | [x] |
 | 10 | Scout (Fetch.ai): Agentverse registration (mailbox) -> pairwise scoring + clue nudge over `state` -> match badge on `/hunt` -> post-haunt rating + predicted-vs-actual on `/screen`; 3 tries through ASI:One, one change from feedback | tarecq | [ ] |
+| 21 | Admin panel `/admin`: attendees, allow/disallow, direct + group messages, open/close events (`ADMIN_TOKEN`) | Chris | [ ] |
 | 11 | Roles on join (Hunter / Ghost / Medium / Possessed) and role-gated views | | [ ] |
 | 12 | Narrator agent: event feed -> Claude -> TTS on `/screen` | | [ ] |
 | 13 | Room scan: Scaniverse -> SPZ -> Spark on `/screen` with live markers | | [ ] |
