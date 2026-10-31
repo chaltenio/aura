@@ -48,3 +48,8 @@ The bus is one pinned GitHub issue (label `bus`) that every teammate's Claude Co
 - Shelled AI: features go through Shelled runs. Every Shelled PR description carries the run link/ID. Every place the agents shone or broke becomes an entry in EDGE_CASES.md the same hour.
 - Second track (Fetch.ai matchmaker or TrueForge Demogorgon): see TODO.md for the decision.
 - Keep proof as you go: screenshots of runs, the X post / 2-minute video for proof of launch.
+
+## Deploy and secrets
+- Host is Fly.io; `scripts/deploy.sh` does the whole deploy (app, volume, secrets, remote build, smoke check). Pushes to `main` auto-deploy once `FLY_API_TOKEN` is a repo secret. Details: docs/DEPLOY.md.
+- Secrets are committed only as `secrets/*.enc.env` (SOPS + age). Never commit `.env`, plaintext `*.env`, or an age private key. Join with `scripts/secrets.sh init`, read with `scripts/secrets.sh decrypt prod`. Details: docs/SECRETS.md.
+- Agents use the project MCP servers in `.mcp.json` (`github`, `fly`, `playwright`) for DevOps; `gh` and `fly` CLIs are the fallback.
