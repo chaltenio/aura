@@ -1,5 +1,6 @@
-# Fly.io config. One-time: `fly launch --copy-config --no-deploy`, `fly volumes create haunt_data --size 1`, then `fly deploy`.
-app = "haunt-aura"
+# Fly.io config. Deploy with scripts/deploy.sh (creates app + volume, stages secrets, deploys, smoke-checks).
+# Change `app` if the name is taken on Fly; everything else reads it from here.
+app = "aura-haunt"
 primary_region = "sjc"
 
 [build]
@@ -18,3 +19,7 @@ primary_region = "sjc"
 [[mounts]]
   source = "haunt_data"
   destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
