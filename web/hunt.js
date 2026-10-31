@@ -1,6 +1,7 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
 import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, renderProfile } from '/common.js';
 import { costumeLayer, costumeTitle, COSTUMES } from '/costume.js';
+import { scoutState, scoutRate } from '/scout.js'; // the Scout: clues on `state`, one rating question after a haunt
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };                          // small numbers line under the camera
@@ -50,7 +51,8 @@ connectWs(me ? { attendee: me.id } : {}, (msg) => {
   if (msg.type === 'attendee_changed') patchPerson(msg.attendee);
   if (msg.type === 'attendee_gone') dropPerson(msg.id);
   if (msg.type === 'gallery_changed' || (msg.type === 'hello' && hellos++)) refreshGallery(); // a later hello is a reconnect: catch up on what it missed
-  if (msg.type === 'haunted') hauntedAlert(msg);
+  if (msg.type === 'haunted') { hauntedAlert(msg); scoutRate(msg.hauntId); }
+  if (msg.type === 'state' && msg.scout) scoutState(msg.scout);
 });
 
 loadEngine({ video: true, onProgress: (t) => { status(t); $('idle-sub').textContent = 'Loading face model… (first time only)'; } })
@@ -110,9 +112,10 @@ $('haunt').onclick = async () => {
   if (hauntSent) return;
   const b = $('haunt'), target = shown; b.disabled = true; hauntSent = true; b.textContent = 'Haunting…';
   try {
-    await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: target.id, similarity: shownSim } });
+    const sent = await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: target.id, similarity: shownSim } });
     if (shownId !== target.id) return;
     b.className = 'ok'; b.textContent = `✓ ${firstName(target.name)} is haunted 👻`; boo(b);
+    scoutRate(sent.hauntId, $('c-profile')); // the Scout's one question, under the card
     closeTimer = setTimeout(() => { if (shownId === target.id) closeCard(true); }, 3500);
   } catch (e) {
     if (shownId !== target.id) return;

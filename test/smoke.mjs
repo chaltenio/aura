@@ -12,7 +12,7 @@ const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
 const MIRROR = 'https://mirror.test'; // stands in for the Base44 mirror's origin (FRONTEND_ORIGINS)
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1', SCOUT_SWEEP_MS: '400', SCOUT_MIN_N: '2' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
@@ -188,6 +188,41 @@ try {
     check(await next((m) => m.type === 'gallery_changed') && (await json('/api/gallery')).data.some((x) => x.id === pia.id && x.costume === 'ghost'), 'instant: opting back in asks phones to refetch the gallery (face descriptors back)');
     hunter.close();
   }
+  { // the Scout (#10, docs/scout/README.md): a complementary pair gets a clue that names nobody, the haunt between them confirms
+    // the match on both phones, both answer one question, and the block on /api/events counts it against the organic baseline
+    const reg = async (name, blurb) => (await json('/api/attendee', { method: 'POST', body: { name, handle: name.toLowerCase(), consent: true, descriptors: [vec()], blurb } })).data;
+    const priya = await reg('Priya', 'Rust CLI that diffs Terraform plans, looking for a cofounder');
+    const marco = await reg('Marco', 'React dashboards for devtools, looking for a cofounder');
+    const listen = (id) => new Promise((res, rej) => { const ws = new WebSocket(`ws://localhost:${PORT}/ws?attendee=${id}`), inbox = []; ws.addEventListener('message', (e) => inbox.push(JSON.parse(e.data))); ws.addEventListener('open', () => res({ ws, inbox })); ws.addEventListener('error', rej); });
+    const P = await listen(priya.id), M = await listen(marco.id);
+    const waitFor = async (inbox, pred, ms = 4000) => { for (const t = Date.now(); Date.now() - t < ms; await new Promise((r) => setTimeout(r, 20))) { const m = inbox.find(pred); if (m) return m; } return null; };
+    const clue = (m) => m.type === 'state' && m.scout?.phase === 'clue';
+    const cP = await waitFor(P.inbox, clue), cM = await waitFor(M.inbox, clue);
+    check(cP && cM && cP.scout.matchId === cM.scout.matchId && cP.scout.deadline > Date.now(), 'scout: both sides of a complementary pair get a clue for the same match');
+    check(cP && !/priya|marco/i.test(cP.scout.clue + cM.scout.clue) && /frontend|React/i.test(cP.scout.clue) && /backend|Rust/i.test(cM.scout.clue), `scout: clues describe the other person without naming them: "${cP?.scout.clue}"`);
+    const evs1 = (await json('/api/events?limit=50')).data; const match = evs1.events.find((e) => e.type === 'match');
+    check(match?.meta?.status === 'open' && match.meta.features.includes('complement') && match.meta.features.includes('intent_match') && match.meta.weights.stack === 0.4, 'scout: match event is open with named features and the weights it used');
+    check(evs1.scout?.clues.sent >= 1 && evs1.scout.clues.pending >= 1 && evs1.scout.version === 1 && evs1.scout.predicted.n === 0, '/api/events carries the scout block for the screen');
+    const h = await json('/api/haunt', { method: 'POST', body: { actorId: priya.id, token: priya.token, targetId: marco.id, similarity: 0.7 } });
+    check(h.status === 200 && h.data.hauntId > 0, 'haunt response carries hauntId (the rating names it)');
+    check((await waitFor(M.inbox, (m) => m.type === 'haunted'))?.hauntId === h.data.hauntId, 'haunted push carries the same hauntId');
+    const found = (m) => m.type === 'state' && m.scout?.phase === 'found';
+    const fP = await waitFor(P.inbox, found), fM = await waitFor(M.inbox, found);
+    check(fP && fM && fP.scout.hauntId === h.data.hauntId && /Paired on/.test(fP.scout.reason), 'scout: the haunt between the pair confirms the match on both phones, with the reason');
+    const rate = (who, verdict, hauntId = h.data.hauntId) => json('/api/rating', { method: 'POST', body: { raterId: who.id, token: who.token, hauntId, verdict, source: 'phone' } });
+    check((await rate({ id: priya.id, token: 'bad' }, 'yes')).status === 403, 'rating: bad token -> 403');
+    check((await rate(priya, 'maybe')).status === 400, 'rating: verdict must be yes, no or knew');
+    const eve = await reg('Eve', ''); check((await rate(eve, 'yes')).status === 404, 'rating: a haunt you were not part of -> 404');
+    const r1 = await rate(priya, 'yes'), r2 = await rate(marco, 'no');
+    check(r1.status === 200 && r1.data.scout === true && /Paired on/.test(r1.data.reason) && r2.status === 200, 'rating: both sides answer; the answer reveals why the Scout paired them');
+    check((await rate(marco, 'yes')).status === 200, 'rating: a second answer overwrites (a mis-tap is fixable)');
+    const st = (await json('/api/events')).data.scout;
+    check(st.predicted.yes === 2 && st.predicted.n === 2 && st.clues.found === 1 && st.ratedPairs === 1, `scout state counts ratings on scout pairs and found clues: ${JSON.stringify(st.predicted)} found ${st.clues.found}`);
+    const plain = await json('/api/haunt', { method: 'POST', body: { actorId: eve.id, token: eve.token, targetId: priya.id } });
+    check((await rate(eve, 'yes', plain.data.hauntId)).data.scout === false && (await json('/api/events')).data.scout.baseline.n === 1, 'rating: an organic haunt counts toward the baseline, not the Scout');
+    check((await rate(priya, 'knew', plain.data.hauntId)).status === 200 && (await json('/api/events')).data.scout.baseline.n === 1, 'rating: "already knew them" is kept but not counted');
+    P.ws.close(); M.ws.close();
+  }
   ws.close();
 
   // admin: auth, block/allow, direct + group message push, events
@@ -219,4 +254,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, static routes, Base44 mirror CORS + sign-in handoff + build)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, scout clues + ratings, static routes, Base44 mirror CORS + sign-in handoff + build)');
