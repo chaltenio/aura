@@ -15,12 +15,14 @@ git fetch -q origin 2>/dev/null
 scripts/bus.sh since 2>/dev/null | tail -n 20 || scripts/bus.sh read 12
 sed -n '/^## STATUS/,/^## Next/p' TODO.md          # STATUS paragraph + Now table
 sed -n '/^## Next/,/^## Done/p' TODO.md             # Next table
-[ -f IDEAS.md ] && sed -n '1,60p' IDEAS.md
+sed -n '/^## 3/,/^## 4/p' IDEAS.md                 # the pickable backlog (table: idea, what, why, needs, effort, track)
 [ -f docs/DEPLOY.md ] && grep -m2 -i "https://" docs/DEPLOY.md
 for b in $(git branch -r --no-merged origin/main | grep -v HEAD); do echo "$b ahead=$(git rev-list --count origin/main..$b) last=$(git log -1 --format=%cr $b) files=$(git diff --name-only origin/main...$b | tr '\n' ' ' | cut -c1-120)"; done
 git config user.name; gh api user --jq .login 2>/dev/null
+name=$(gh api user --jq .login 2>/dev/null || git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')
+git branch --list "$name/*"; git branch -r --no-merged origin/main | grep "origin/$name/"     # branches this person already has
 ```
-Unclaimed = rows in Now/Next with an empty Owner cell. Live URL = the first https URL in docs/DEPLOY.md, else the one in STATUS, else "nothing deployed yet".
+Unclaimed = rows of the IDEAS.md section 3 table whose idea name does not appear in TODO.md Now or Done, plus TODO.md Next rows with an empty Owner cell. Cross out anything already claimed. Live URL = the first https URL in docs/DEPLOY.md, else the one in STATUS, else "nothing deployed yet".
 
 ## 2. Greet (five lines, then one question)
 
@@ -30,8 +32,9 @@ Live: <URL or "nothing deployed; local + tunnel only">. Main is <green/red per l
 Claimed: <name>: <task> (<files>); <name>: <task>.
 Unclaimed: <#> <task>; <#> <task>; <#> <task>.
 In flight: <branch> (<owner>, <ahead> commits, <files>) ...
+Yours: <name>/<task> (<ahead> commits, last <when>)        <- only if they already have an unmerged branch
 ```
-Then ask exactly one question: **"What do you want to build?"** Offer the top three unclaimed items (prefer Now over Next, prefer items that unblock others, prefer items whose files nobody is touching) plus "something else". Use `AskUserQuestion` when it is available, otherwise plain text with numbered options.
+Then ask exactly one question: **"What do you want to build?"** If they already have an unmerged branch, the first option is "Continue <branch>". Then the top three unclaimed items from IDEAS.md section 3 (show effort and track; prefer S effort, items that unblock others, and files nobody is touching), then "something else". Use `AskUserQuestion` when it is available, otherwise plain text with numbered options.
 
 Skip the greeting only if the person's first message is already a concrete task; then go straight to step 3 with that task.
 
@@ -41,7 +44,11 @@ Skip the greeting only if the person's first message is already a concrete task;
 - Check overlap: any in-flight branch whose `files=` list intersects, any Now row whose files are the same. If there is overlap, say who, which file, and propose the smallest split (e.g. "take the `/screen` side; Sam has `server/index.js` until 2:15").
 - If the idea is not in TODO.md, write a one-line task for it. If it breaks a DECIDE on the bus or a product rule in CLAUDE.md (faces to a hosted model, consent as a UI nicety), say so and offer the nearest allowed version.
 
-## 4. Claim, branch, record, push
+## 4. Claim, branch (or continue), record, push
+
+Continuing an existing branch: `git switch <name>/<task> && scripts/sync.sh --no-test` (rebases it onto main and pushes), confirm the TODO row still has their name, skip the claim unless the bus has no `[CLAIM]` for it. Then go to step 5.
+
+New task:
 
 ```bash
 name=$(gh api user --jq .login 2>/dev/null || git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')
