@@ -39,7 +39,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 12 | Narrator agent: event feed -> Claude -> TTS on `/screen` | | [ ] |
 | 13 | Room scan: Scaniverse -> SPZ -> Spark on a new `/room` page, ghosts on live haunts. Brief: docs/ROOM_SCAN.md. Matt is offering it to tarecq (15:05) | | [ ] |
 | 14 | Sigil posters (AR.js pattern markers + QR fallback) and `/zone` events | | [ ] |
-| 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | | [ ] |
+| 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | mthomas100 | [ ] |
 | 16 | Feedback swap with one other team (Stranger Builds requirement) and one change from it | | [ ] |
 | 17 | Most Wanted bounty: server picks a consenting attendee every 5 min, `state` broadcast, `/screen` banner, first haunt scores 3 (IDEAS.md 3) | | [ ] |
 | 18 | Haunt back: one button on the `haunted` notification that haunts the hunter back (IDEAS.md 3) | Matt | [x] |
