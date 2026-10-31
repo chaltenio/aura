@@ -20,6 +20,30 @@ HAUNT: opt-in face-to-profile recognition from a phone browser at a conference. 
 | 5 | Set dressing: room scan, sigils | not started (free to take, below) |
 | 6 | Chirp throw, matchmaker agent, treat stations | not started (see below) |
 
+## 2b. The Scout: find people by face, not by name (second track, tarecq, 14:20)
+
+Where the matchmaker idea went after an hour of talking it through. Short version: **the camera is the lookup, the name is the reward.** An agent decides who in the room should meet, but never tells you who. You get a clue and have to find them with `/hunt`.
+
+Why it beats a "who should I meet" chatbot:
+- Every other networking tool starts from a name and sends you looking for a badge. HAUNT inverts it: you look at people, the phone matches on-device, and only the right face unlocks the profile and the reason you were paired.
+- A haunt is a consented, timestamped, in-person meeting. That is ground truth no chat product has. Ask both people afterwards "worth it?" and the agent's predictions get scored against reality. That calibration loop is the moat, and we get the signal for free from the event log.
+- The face half and the agent half never touch. Faces stay on the phone; the agent only reads profiles, GitHub activity and events. Say that out loud to judges.
+
+The mechanic (one round):
+1. **Scout** scores every pair of opt-in attendees for complementarity (GitHub repos, blurb, what they say they are looking for). Surfaces a pair only when it scores well in both directions (mutual gate = symmetric consent).
+2. **Clue, not a name.** Both phones get a nudge over the existing `state` socket: "Your match shipped a Rust CLI this week and wants a cofounder." No name, no photo. Clues come from profile + public GitHub only.
+3. **Hunt confirms.** `/hunt` marks the card as *your match* only when the camera lands on that person. Optional warmer/colder: the scout can rank the room, near-matches glow a little.
+4. **Haunt wins.** Haunting your match scores double, both phones shriek, `/screen` says "Two found each other." Both are hunting at once with their own clue; first to find wins the round.
+5. **Rate.** One tap after the haunt: worth it / not. `/screen` shows predicted vs actual as a running score. The agent reads it and changes its prompt or weights (the "one change from feedback" the Fetch.ai track asks for).
+
+Roles fall out of it without a role system: the person being described is the Ghost for that round, the one holding the clue is the Hunter, the scout is the Medium.
+
+Fetch.ai fit: the scout is a uAgent on Agentverse with a mailbox so "Who should I meet at HAUNT?" reaches it through ASI:One (3 tries, one change from feedback). Build order: Agentverse registration first (45 min, human), then pairwise scoring + clue nudge, then match-aware hunt card, then rating + scoreboard.
+
+Dropped on purpose (good ideas, not for today): one agent per person, agent-to-agent negotiation, sender-pays economics, readiness over time, Fetch.ai payments. The scout + mutual gate + one rating question is the whole demo.
+
+Touches: new `server/scout.js` (or its own small process), `POST /api/rating`, a `match` event type, a `state` payload for the clue, a small match badge in `web/hunt.js`. Reads `GET /api/gallery` (ids), `GET /api/attendee/:id/card`, `GET /api/events`.
+
 ## 3. Ideas that fit and are free for another teammate to take
 
 All of these sit beside the core. They consume the server's API and WebSocket (ARCHITECTURE.md section 3) and never edit `web/register|hunt|me`, `web/face.js`, or `server/index.js` internals. Claim one in TODO.md before starting.
@@ -28,10 +52,14 @@ All of these sit beside the core. They consume the server's API and WebSocket (A
 |---|---|---|---|---|---|
 | **CSV + LinkedIn photo pipeline** | Script or page that turns the attendee list (name, LinkedIn URL) into photos on disk, then feeds `/enroll`. A teammate already extracts LinkedIn photos with a v0 app; wrap that. | It is how the room gets pre-registered without selfies | `/enroll` page (CSV columns `name,handle,linkedin,blurb,photo`) | S | all |
 | **Narrator / game master** | Server-side loop that batches the event feed every 20 to 30 s, asks Claude for a two-line spooky announcement, pipes to ElevenLabs TTS, plays on `/screen` | Most visible agent in the demo, pure Messages API | `GET /api/events`, screen WS `event` messages; add an audio element on `/screen` | S | Shelled edge cases (agents can't hear TTS) |
-| **Matchmaker uAgent on Agentverse** | "Who should I meet" chat agent over the opt-in profiles + GitHub activity, registered with Mailbox so it shows in ASI:One | Fetch.ai track needs an agent with 3 tries through ASI:One | `GET /api/events` (attendees list), `GET /api/attendee/:id` | S to M (45 to 60 min is registration) | **Fetch.ai** |
+| ~~Matchmaker uAgent on Agentverse~~ **became the Scout (section 2b, tarecq)** | Pairwise scoring, clue-not-name nudge, mutual gate, hunt confirms, post-haunt rating | Fetch.ai track; the hunt is the ground truth | `GET /api/gallery`, `GET /api/attendee/:id/card`, `GET /api/events`; adds `POST /api/rating`, `match` event | M | **Fetch.ai** |
 | **Demogorgon localizer on TrueForge** | Attendees upload a photo of their surroundings; Claude vision picks the zone/sigil it was taken from; a memory file of confirmed pairs makes run 2 beat run 1 on a fixed held-out set | TrueForge wants "a later run that improves by changing its own skills or instructions" | Nothing from the core; its own `/api/zone` or a separate service; sigil photos | M | **TrueForge** |
 | **Room scan on the big screen** | Scaniverse scan (no LiDAR needed) -> SPZ -> Spark in three.js on `/screen`, haunt events as sprites at hand-placed coordinates | The one thing nobody else in the room will have | screen WS `event` messages | M (1 h) | demo |
 | **Sigils + `/sigil` page** | Printed high-contrast posters as AR.js pattern markers with a QR per zone; scanning shows a ghost and POSTs the zone | Theming, "where are you" without localization tech | a new `zone` event type (add `POST /api/zone` in a separate route file) | M | demo |
+| **Most Wanted bounty** | Every 5 min the server picks a random consenting attendee, broadcasts it on `state`, `/screen` shows "Most Wanted: Sam. First haunt scores 3." | Turns a demo into a room-wide hunt; ~40 server lines + a screen banner | `state` WS message, `/screen` banner | S | demo |
+| **Haunt back** | The `haunted` notification already carries the hunter's card; add one button that haunts them back | Closes the social loop in one tap; two phones shriek in sequence on stage | `POST /api/haunt` from the notification in `web/me.js` / `common.js` | S | demo |
+| **Tonight's connections on `/me`** | List of everyone you haunted or were haunted by, with GitHub/LinkedIn links and "copy as text" | The networking payoff the pitch promises; nothing shows it to the user yet | `GET /api/events` filtered to me | S | demo |
+| **Post-event digest** | Claude writes each person a short "who you met tonight" from events + profiles only (names, repos, times; never faces) | Natural second skill for the Scout; the answer to "where is the LLM" | `GET /api/events`, cards | S | **Fetch.ai** / demo |
 | **Roles + scoreboard** | Assign Hunter/Ghost/Medium/Possessed at join; role-gated views; most-haunted and top-hunter boards already exist | Turns networking into a game | `role` column exists in the data model; `state` WS message is reserved for this | M | demo |
 | **NFC tap-to-join** | NTAG213 stickers written with the free NFC Tools app pointing at `/register`; iPhone XS+ opens them from the lock screen | Zero-friction onboarding at the door | nothing | S (hardware run) | real users |
 | ~~GitHub "pushed this week" on the card~~ **DONE** (main-session, 4be2a21) | Cards now show bio, company, location, followers, pushes this week, active + recent repos, GitHub/LinkedIn links (`server/profile.js`, `renderProfile` in common.js) | | | | demo |

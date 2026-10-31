@@ -23,14 +23,18 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | # | Task | Owner | Done |
 |---|------|-------|------|
 | 8 | GitHub OAuth, then LinkedIn OIDC (store picture bytes, not the URL) on `/register` | main session (GitHub/LinkedIn), Chris (Google/Apple) | [x] |
-| 9 | Decide the second track: Fetch.ai matchmaker (lower risk) vs TrueForge Demogorgon (higher payoff). Record the decision here | | [ ] |
-| 10 | Fetch.ai: matchmaker uAgent on Agentverse (mailbox), 3 tries through ASI:One, one change from feedback | | [ ] |
+| 9 | Decide the second track: **Fetch.ai, as the Scout** (IDEAS.md 2b: find people by face not name, clue nudge, hunt confirms, post-haunt rating). TrueForge dropped: needs venue photos + two measured runs. | tarecq | [x] |
+| 10 | Scout (Fetch.ai): Agentverse registration (mailbox) -> pairwise scoring + clue nudge over `state` -> match badge on `/hunt` -> post-haunt rating + predicted-vs-actual on `/screen`; 3 tries through ASI:One, one change from feedback | tarecq | [ ] |
 | 11 | Roles on join (Hunter / Ghost / Medium / Possessed) and role-gated views | | [ ] |
 | 12 | Narrator agent: event feed -> Claude -> TTS on `/screen` | | [ ] |
 | 13 | Room scan: Scaniverse -> SPZ -> Spark on `/screen` with live markers | | [ ] |
 | 14 | Sigil posters (AR.js pattern markers + QR fallback) and `/zone` events | | [ ] |
 | 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | | [ ] |
 | 16 | Feedback swap with one other team (Stranger Builds requirement) and one change from it | | [ ] |
+| 17 | Most Wanted bounty: server picks a consenting attendee every 5 min, `state` broadcast, `/screen` banner, first haunt scores 3 (IDEAS.md 3) | | [ ] |
+| 18 | Haunt back: one button on the `haunted` notification that haunts the hunter back (IDEAS.md 3) | | [ ] |
+| 19 | Tonight's connections on `/me`: who you haunted / were haunted by, links, copy as text (IDEAS.md 3) | | [ ] |
+| 20 | Post-event digest: Claude writes "who you met tonight" from events + profiles only (IDEAS.md 3) | | [ ] |
 
 ## Done
 
@@ -43,6 +47,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 - Tracks: **Shelled AI** + one of Fetch.ai / TrueForge (max 2 per project). Base44 skipped.
 - Git: one branch per session (`<name>/<task>`), atomic commits, `scripts/sync.sh` after every commit, land with `/merge`. Nobody commits to `main` by hand. (Replaced direct-to-main at 13:40: parallel sessions were colliding on the same files.)
 - Face matching is on-device only. No face image or embedding reaches a hosted model.
+- Second track is **Fetch.ai**, built as the Scout (IDEAS.md 2b): the agent pairs people and gives clues, the camera finds them, the haunt is the ground truth. Clues come from profiles and public GitHub only, never from faces. (14:20, tarecq)
 - Never close a PR or issue, or delete a branch, without a comment saying why and where the work went (13:51, CLAUDE.md). `/merge` and the integrator comment on the open PR before deleting its branch.
 
 | GitHub profile enrichment on cards (bio, location, pushes this week, repos, LinkedIn link) | main-session | 4be2a21 |
