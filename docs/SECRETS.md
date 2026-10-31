@@ -33,7 +33,8 @@ Step-by-step provider app setup (GitHub, LinkedIn, Google, Apple) is in OAUTH_SE
 
 Keys in the file: `PUBLIC_BASE_URL`, `ANTHROPIC_API_KEY`, `LINKEDIN_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`,
 `APPLE_CLIENT_ID` (Services ID), `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the .p8 with newlines written as `\n`),
-`ELEVENLABS_API_KEY`, `ASI_ONE_API_KEY`, `TRUEFOUNDRY_API_KEY`. Add new ones with `set`.
+`ELEVENLABS_API_KEY`, `ASI_ONE_API_KEY`, `TRUEFOUNDRY_API_KEY`, `ADMIN_TOKEN` (opens `/admin`; sent as `x-admin-token`).
+Add new ones with `set`.
 
 ## Why this and not the alternatives
 
