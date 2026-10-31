@@ -276,8 +276,16 @@ export async function createLens(wrap, { onTracking } = {}) {
   const pr = Math.min(2, window.devicePixelRatio || 1);
   renderer.setPixelRatio(pr); renderer.setClearColor(0x000000, 0); renderer.autoClear = false;
   const flatCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1); // the 2D pass places vertices itself
-  const camTex = new T.Texture(); camTex.minFilter = T.LinearFilter; camTex.generateMipmaps = false;
-  const shared = { cam: { value: camTex }, res: { value: new T.Vector2(1, 1) }, size: { value: new T.Vector2(1, 1) }, time: { value: 0 } };
+  // The camera image the paint is shaded from. A <video> needs three's VideoTexture: a plain Texture sizes itself from the
+  // element's width attribute, which is 0 for a video, and the upload fails (black skin, WebGL errors).
+  const imgTex = new T.Texture(); imgTex.minFilter = T.LinearFilter; imgTex.generateMipmaps = false;
+  let vidTex = null;
+  const camFor = (src) => {
+    if (!src.videoWidth) { imgTex.image = src; imgTex.needsUpdate = true; return imgTex; }
+    if (vidTex?.image !== src) { vidTex?.dispose(); vidTex = new T.VideoTexture(src); vidTex.minFilter = T.LinearFilter; vidTex.generateMipmaps = false; }
+    return vidTex;
+  };
+  const shared = { cam: { value: imgTex }, res: { value: new T.Vector2(1, 1) }, size: { value: new T.Vector2(1, 1) }, time: { value: 0 } };
   const scene2d = new T.Scene();
   const texCache = {};
   const look = (kind) => (texCache[kind] ||= (() => { const t = textures(kind); return { paint: new T.CanvasTexture(t.paint), fx: new T.CanvasTexture(t.fx) }; })());
@@ -461,7 +469,7 @@ export async function createLens(wrap, { onTracking } = {}) {
       const fresh = isVideo ? src.currentTime !== lastFrame : src !== lastImg;
       if (fresh) {
         lastFrame = isVideo ? src.currentTime : -1; lastImg = isVideo ? null : src;
-        camTex.image = src; camTex.needsUpdate = true;
+        shared.cam.value = camFor(src);
         for (const tr of tracks.values()) if (recog.has(tr.id)) track(tr, src, W, H, now);
         frames++;
       }
