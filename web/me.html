@@ -13,8 +13,9 @@
     <div class="check"><input id="consent" type="checkbox"><label for="consent" style="margin:0">Findable (uncheck to vanish from every phone immediately)</label></div>
     <button class="danger" id="forget">Forget me on this phone</button>
   </div>
-  <h2>Haunted by</h2><ul class="feed" id="received"></ul>
-  <h2>You haunted</h2><ul class="feed" id="given"></ul>
+  <h2>Tonight's connections <span id="nconn"></span></h2>
+  <div class="conn-actions" id="connact" hidden><button class="secondary" id="copy">Copy as text</button><button class="secondary" id="share" hidden>Share</button></div>
+  <ul class="conns" id="conns"></ul>
 </div>
 <p class="hint"><a href="/">Home</a></p>
 <script type="module" src="/me.js"></script>

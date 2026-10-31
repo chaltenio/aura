@@ -57,3 +57,17 @@ button:disabled { opacity:.45; }
 .profile .p-links { margin-top: 8px; }
 .profile .p-links a { font-weight: 600; margin-right: 6px; }
 .sheet { max-height: 70vh; overflow-y: auto; }
+/* /me: tonight's connections */
+.conn-actions { display: flex; gap: 10px; }
+.conn-actions[hidden] { display: none; }
+.conn-actions button { flex: 1; min-width: 0; margin-top: 0; }
+.conns { list-style: none; padding: 0; margin: 0; }
+.conns li { padding: 10px 0; border-bottom: 1px solid #221f2e; }
+.conns li.conn { display: flex; gap: 10px; align-items: center; }
+.conn-av { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #2a2738; flex: none; display: grid; place-items: center; font-size: 20px; }
+.conn-main { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.conn-meta { font-size: 13px; color: var(--mute); margin-top: 2px; }
+.conn-meta a { font-weight: 600; }
+.conn-meta .dir { color: var(--ink); }
+.conn-meta .dir.both { color: var(--ok); }
+.conn-meta .dir.in { color: var(--glow); }
