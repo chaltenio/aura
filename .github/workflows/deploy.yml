@@ -21,3 +21,23 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - if: steps.tok.outputs.has != 'true'
         run: echo "FLY_API_TOKEN not set; skipping deploy (see docs/DEPLOY.md)"
+  # The same web/ pages on Base44 hosting (https://aura-haunt.base44.app), calling the Fly API (scripts/base44.mjs).
+  # After fly, so the API the new pages expect is live before they are.
+  base44:
+    needs: fly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: has Base44 token?
+        id: tok
+        run: echo "has=${{ secrets.BASE44_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.tok.outputs.has == 'true'
+        run: node scripts/base44.mjs deploy
+        env:
+          BASE44_TOKEN: ${{ secrets.BASE44_TOKEN }}
+          GIT_SHA: ${{ github.sha }}
+      - if: steps.tok.outputs.has != 'true'
+        run: echo "BASE44_TOKEN not set; skipping the Base44 mirror (see docs/DEPLOY.md)"

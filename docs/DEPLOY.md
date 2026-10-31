@@ -34,6 +34,38 @@ gh secret set FLY_API_TOKEN --repo chaltenio/aura # paste the token
 
 Without the secret the deploy job prints a notice and passes, so CI stays green for forks and teammates.
 
+After the Fly job, the `base44` job deploys the Base44 mirror (below) **if** the repo secret `BASE44_TOKEN` exists.
+
+## Base44 mirror (second URL, Base44 "Real users" challenge)
+
+The same `web/` pages also live on Base44 hosting: **https://aura-haunt.base44.app** (Base44 app `HAUNT`, id
+`6ae6701d773bec7f249e1409`, created 2026-10-31 22:47 UTC in Matt's workspace). Only the pages move. The API, the
+socket, the JSON store and the OAuth apps stay on Fly, so a phone on either URL hunts and haunts phones on the other.
+
+- **Build:** `node scripts/base44.mjs build` writes `dist/base44/`: the FaceX weights, `window.HAUNT_API` (the Fly
+  URL) in every page, a router in `index.html` (Base44 answers any path that is not a file with `index.html`, so
+  `/register` goes to `/register.html`), and `?v=<sha>` on every local script and stylesheet, because Base44 caches
+  those for an hour.
+- **Deploy:** `node scripts/base44.mjs deploy` builds, uploads a tar.gz to Base44's deploy-dist API, waits for the new
+  build and runs the live checks. It needs `BASE44_TOKEN`, or your own Base44 CLI login (`npx base44 login`, once).
+  Base44's CLI does the same upload: `BASE44_APP_ID=6ae6701d773bec7f249e1409 npx base44 site deploy --build -y`
+  (`base44/config.jsonc`). The limits are 50 MB, 1,000 files and 5 deploys a minute per workspace.
+- **Check only:** `node scripts/base44.mjs check` confirms the live pages are this build and that Fly accepts the mirror's origin.
+- **Fly side:** `FRONTEND_ORIGINS` in `fly.toml` lists the origins allowed to call the API and to receive sign-in
+  handoffs (`server/cors.js`). A new domain for the mirror (a custom domain on Base44) goes there first.
+- **Sign-in on the mirror:** the button goes to Fly's `/auth/<provider>?return=<mirror page>`; the callback returns to
+  that page with `#haunt_session=...`, and the page sends it as a header. A third-party cookie would not work, because
+  iOS Safari drops them. The LinkedIn app's redirect URL is unchanged (Fly's callback).
+- **CI secret, once:** in Base44, open the workspace name (bottom left), then Settings, Secrets, Personal access tokens,
+  Create access token. Pick Access: one app, `HAUNT`, and Permission: Full access. Then:
+
+```bash
+gh secret set BASE44_TOKEN --repo chaltenio/aura   # paste the token
+```
+
+Nothing about faces goes to Base44: matching runs on the phone and the gallery stays on Fly. Base44 sees page views
+(its analytics tag sits on `index.html`, which every pretty URL passes through).
+
 ## No account yet? Tunnel fallback
 
 `npm start` plus `npm run tunnel` (cloudflared quick tunnel) gives a public HTTPS URL to the laptop in 10 seconds.
