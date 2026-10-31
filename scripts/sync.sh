@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# sync.sh: run after every atomic commit.
-#   on a branch: pull your own branch if it exists on origin, run the smoke test if present, push the branch (-u origin HEAD)
-#   on main:     refuse. main moves only through /merge (which sets MERGE_SKILL=1)
-# Usage: scripts/sync.sh [--no-test]
+# sync.sh: run before starting a chunk, after every atomic commit, and at least every 15 minutes.
+#   on a branch: fetch, rebase your branch onto origin/main (autostash), run the smoke test if present, push (-u origin HEAD)
+#   on main:     refuse. main moves only through /merge or the integrator (which set MERGE_SKILL=1)
+# Usage: scripts/sync.sh [--no-test]     (SKIP_TEST=1 also skips the test)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 branch=$(git branch --show-current)
 if [[ -z "$branch" ]]; then echo "sync: detached HEAD. git switch -c <name>/<task> first."; exit 1; fi
 if [[ "$branch" == "main" && "${MERGE_SKILL:-0}" != "1" ]]; then
-  echo "sync: you are on main. Nobody pushes main by hand; work on a branch (git switch -c <name>/<task>) and land it with /merge."; exit 1
+  echo "sync: you are on main. Nobody pushes main by hand; work on a branch (run /start) and land it with scripts/bus.sh ready or /merge."; exit 1
 fi
 git fetch -q origin
-if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-  if ! git pull --rebase --autostash -q origin "$branch"; then
-    echo "sync: REBASE CONFLICT on your own branch. Fix the files listed above, then: git add <files> && git rebase --continue && scripts/sync.sh"; exit 1
+if [[ "$branch" != "main" ]]; then
+  if git show-ref --verify --quiet "refs/remotes/origin/$branch" && ! git merge-base --is-ancestor "origin/$branch" HEAD; then
+    # someone (or another machine) pushed to this branch: take their commits first
+    git pull --rebase --autostash -q origin "$branch" || { files=$(git diff --name-only --diff-filter=U | tr '\n' ' '); git rebase --abort || true; echo "sync: conflict with origin/$branch in: $files. Run /merge to resolve."; exit 1; }
+  fi
+  if ! git merge-base --is-ancestor origin/main HEAD; then
+    if ! git rebase --autostash -q origin/main; then
+      files=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+      git rebase --abort || true
+      echo "sync: rebase conflict with origin/main in: $files. Run /merge to resolve (it keeps both sides' intent)."; exit 1
+    fi
+    echo "sync: rebased $branch onto origin/main"
   fi
 fi
-if [[ "${1:-}" != "--no-test" ]] && node -e 'const p=require("./package.json");process.exit(p.scripts&&p.scripts.test?0:1)' 2>/dev/null; then
+if [[ "${1:-}" != "--no-test" && "${SKIP_TEST:-0}" != "1" ]] && node -e 'const p=require("./package.json");process.exit(p.scripts&&p.scripts.test?0:1)' 2>/dev/null; then
   echo "sync: running npm test"; npm test --silent || { echo "sync: TEST FAILED. Fix before pushing (or scripts/sync.sh --no-test for a docs-only change)."; exit 1; }
 fi
 if [[ "$branch" == "main" ]]; then git push -q origin main; else git push -q -u origin HEAD; fi
