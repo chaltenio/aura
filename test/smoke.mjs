@@ -1,7 +1,7 @@
 // Smoke test: boots the server on a random port with a temp data dir and exercises the API + push path.
 // No browser or face model needed (descriptors are random vectors). Run: npm test
-import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const MIRROR = 'https://mirror.test'; // stands in for the Base44 mirror's origin (FRONTEND_ORIGINS)
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
@@ -40,6 +41,39 @@ try {
     const got = [img(1), img(1), img(2), img(3, 'def5678'), {}, img(3, 'def5678')].map((env, i) => deployInfo(dir, env, 1000 + i));
     const want = [[1, 1000], [1, 1000], [2, 1002], [3, 1003], [null, null], [3, 1003]];
     check(JSON.stringify(got.map((v) => [v.deploy, v.deployedAt])) === JSON.stringify(want), `deploy counter: ${JSON.stringify(got)}`);
+  }
+  { // Base44 mirror (#32): CORS for FRONTEND_ORIGINS only; sign-in comes back to the mirror page as #haunt_session, used as a header
+    const pre = (origin) => fetch(BASE + '/api/attendee', { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-haunt-session' } });
+    const okPre = await pre(MIRROR);
+    check(okPre.status === 204 && okPre.headers.get('access-control-allow-origin') === MIRROR && /x-haunt-session/.test(okPre.headers.get('access-control-allow-headers') || ''), `mirror preflight -> ${okPre.status} ${okPre.headers.get('access-control-allow-origin')}`);
+    check(!(await pre('https://evil.test')).headers.get('access-control-allow-origin'), 'an origin outside FRONTEND_ORIGINS gets no CORS headers');
+    check((await fetch(BASE + '/api/gallery', { headers: { origin: MIRROR } })).headers.get('access-control-allow-origin') === MIRROR, 'mirror GET gets Access-Control-Allow-Origin');
+    check((await fetch(BASE + '/auth/fake?return=' + encodeURIComponent('https://evil.test/register.html'), { redirect: 'manual' })).status === 400, 'sign-in return to an unknown origin -> 400 (no open redirect)');
+    const signIn = async (ret) => { // walk /auth/fake -> callback with the cookies a browser would carry; returns the final Location
+      const start = await fetch(BASE + '/auth/fake' + (ret ? '?return=' + encodeURIComponent(ret) : ''), { redirect: 'manual' });
+      const cookie = start.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+      return (await fetch(new URL(start.headers.get('location'), BASE), { redirect: 'manual', headers: { cookie } })).headers.get('location');
+    };
+    check(await signIn() === '/register', 'same-origin sign-in still lands on /register');
+    const loc = await signIn(MIRROR + '/register.html');
+    const tok = (loc || '').match(/^https:\/\/mirror\.test\/register\.html#haunt_session=([\w-]+\.[\w-]+)$/)?.[1];
+    check(tok, `mirror sign-in lands on the mirror page with #haunt_session: ${loc}`);
+    const sess = await (await fetch(BASE + '/api/session', { headers: { 'x-haunt-session': tok || 'x' } })).json();
+    check(sess?.name === 'Fake Person' && sess.linked?.includes('fake'), 'x-haunt-session header reads the signed-in session');
+    check(await (await fetch(BASE + '/api/session', { headers: { 'x-haunt-session': (tok || 'x') + 'x' } })).json() === null, 'a tampered x-haunt-session is ignored');
+    const reg = await fetch(BASE + '/api/attendee', { method: 'POST', headers: { 'content-type': 'application/json', 'x-haunt-session': tok || 'x', origin: MIRROR }, body: JSON.stringify({ consent: true, descriptors: [vec()] }) });
+    const regd = await reg.json();
+    check(reg.ok && reg.headers.get('access-control-allow-origin') === MIRROR && (await json(`/api/attendee/${regd.id}`)).data.name === 'Fake Person', 'mirror registration takes the name from the header session');
+    if (regd.id) await json(`/api/attendee/${regd.id}`, { method: 'PATCH', body: { token: regd.token, consent: false } }); // keep later gallery counts as they were
+  }
+  { // Base44 build (scripts/base44.mjs): API config in every page, router in index.html, one ?v= key per module
+    const out = mkdtempSync(join(tmpdir(), 'haunt-b44-'));
+    const b = spawnSync(process.execPath, [join(ROOT, 'scripts/base44.mjs'), 'build'], { encoding: 'utf8', env: { ...process.env, BASE44_OUT: out, BASE44_WEIGHTS: '0', HAUNT_API: 'https://api.test', GIT_SHA: 'abcdef123' } });
+    check(b.status === 0, 'base44 build: ' + (b.stderr || b.stdout));
+    const read = (f) => { try { return readFileSync(join(out, f), 'utf8'); } catch { return ''; } };
+    for (const f of ['index.html', 'register.html', 'hunt.html', 'me.html', 'screen.html', 'admin.html']) check(read(f).includes('window.HAUNT_API="https://api.test"'), `base44 build: ${f} has no API config`);
+    check(read('index.html').includes('"/register"') && read('index.html').includes("location.replace(p+'.html'"), 'base44 build: index.html routes /register to /register.html');
+    check(read('hunt.html').includes('src="/hunt.js?v=abcdef1"') && read('hunt.js').includes("from '/common.js?v=abcdef1'") && !/from '\/[\w-]+\.js'/.test(read('hunt.js') + read('register.js') + read('me.js')), 'base44 build: every module import carries ?v=<sha>');
   }
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: false, descriptors: [vec()] } })).status === 400, 'consent=false should be rejected');
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: true, descriptors: [[1, 2, 3]] } })).status === 400, 'short descriptor should be rejected');
@@ -185,4 +219,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, static routes)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, static routes, Base44 mirror CORS + sign-in handoff + build)');

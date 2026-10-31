@@ -1,7 +1,11 @@
 // OAuth sign-in (GitHub, LinkedIn OIDC, Google OIDC, Sign in with Apple). Pure Node, no deps. Enabled per provider when its env vars exist.
 // Flow: GET /auth/:provider -> provider -> GET|POST /auth/:provider/callback -> profile cached server-side -> cookie -> /register
 // Signing in with a second provider while a session exists links it to the same profile (see `linked`).
+// Mirror flow (the Base44 copy of web/, another origin): GET /auth/:provider?return=<page on an allowed origin> -> ... ->
+// callback redirects to that page with #haunt_session=<sid>.<sig>; the page keeps it and sends it as the x-haunt-session
+// header, because a cookie on this domain would be a third-party cookie there (Safari drops those).
 import { randomBytes, createHmac, createPrivateKey, sign as signRaw } from 'node:crypto';
+import { isFrontendOrigin } from './cors.js';
 
 const b64u = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
 // Apple wants a client secret that is a short-lived ES256 JWT signed with the team's .p8 key (env holds it with literal \n).
@@ -56,6 +60,13 @@ const PROVIDERS = {
       return { provider: 'apple', providerId: String(claims.sub), name: `${n.firstName || ''} ${n.lastName || ''}`.trim(), handle: '', avatarUrl: null, linkedin: '' };
     },
   },
+  // Test only (npm test sets OAUTH_FAKE=1, Fly never does): signs in as a fixed person without leaving this server,
+  // so the smoke test walks the real redirect, cookie and #haunt_session handoff path.
+  fake: {
+    enabled: () => process.env.OAUTH_FAKE === '1',
+    authorize: (redirect, state) => `${redirect}?${new URLSearchParams({ code: 'fake', state })}`,
+    profile: async () => ({ provider: 'fake', providerId: '1', name: 'Fake Person', handle: 'fake', avatarUrl: null, linkedin: '' }),
+  },
 };
 
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
@@ -70,9 +81,19 @@ const baseUrl = (req) => (process.env.PUBLIC_BASE_URL || `${req.headers['x-forwa
 
 /** Profile for this request's session cookie, or null. */
 export function sessionProfile(req) {
-  const c = cookies(req); const sid = c.haunt_sid;
-  if (!sid || c.haunt_sig !== sign(sid)) return null;
-  return sessions.get(sid) || null;
+  const sid = sessionId(req);
+  return (sid && sessions.get(sid)) || null;
+}
+/** Signed session id from the x-haunt-session header (`<sid>.<sig>`, cross-origin pages) or the cookies (same origin). */
+function sessionId(req) {
+  const [hsid, hsig] = String(req.headers['x-haunt-session'] || '').split('.');
+  if (hsid && hsig === sign(hsid)) return hsid;
+  const c = cookies(req);
+  return c.haunt_sid && c.haunt_sig === sign(c.haunt_sid) ? c.haunt_sid : null;
+}
+/** `return` URL for the sign-in handoff if its origin is an allowed frontend (server/cors.js), else null. Never an open redirect. */
+function handoffUrl(ret) {
+  try { const u = new URL(String(ret || '')); if (!isFrontendOrigin(u.origin)) return null; u.hash = ''; return u.href; } catch { return null; }
 }
 
 async function fetchAvatar(url) {
@@ -88,13 +109,16 @@ async function fetchAvatar(url) {
 export function mountAuth(app) {
   app.get('/api/auth/providers', (_req, res) => res.json(Object.entries(PROVIDERS).filter(([, p]) => p.enabled()).map(([k]) => k)));
   app.get('/api/session', (req, res) => { const p = sessionProfile(req); res.json(p ? { provider: p.provider, linked: Object.keys(p.linked || {}), name: p.name, handle: p.handle, avatar: p.avatar, linkedin: p.linkedin } : null); });
-  app.post('/api/session/logout', (req, res) => { const c = cookies(req); if (c.haunt_sid) sessions.delete(c.haunt_sid); setCookie(res, 'haunt_sid', '', 0); setCookie(res, 'haunt_sig', '', 0); res.json({ ok: true }); });
+  app.post('/api/session/logout', (req, res) => { const sid = sessionId(req); if (sid) sessions.delete(sid); setCookie(res, 'haunt_sid', '', 0); setCookie(res, 'haunt_sig', '', 0); res.json({ ok: true }); });
 
   app.get('/auth/:provider', (req, res) => {
     const p = PROVIDERS[req.params.provider];
     if (!p || !p.enabled()) return res.status(404).send('provider not configured');
+    const ret = req.query.return ? handoffUrl(req.query.return) : null;
+    if (req.query.return && !ret) return res.status(400).send('return must be a page on an allowed frontend origin (FRONTEND_ORIGINS)');
     const state = randomBytes(16).toString('hex');
     setCookie(res, 'oauth_state', `${req.params.provider}:${state}:${sign(state)}`, 600, 'None');
+    setCookie(res, 'oauth_return', ret || '', ret ? 600 : 0, 'None'); // None like oauth_state: Apple's form_post callback is a cross-site POST
     res.redirect(p.authorize(`${baseUrl(req)}/auth/${req.params.provider}/callback`, state));
   });
 
@@ -117,8 +141,12 @@ export function mountAuth(app) {
         sid = randomBytes(16).toString('hex'); profile.linked = { [profile.provider]: profile.providerId }; sessions.set(sid, profile);
       }
       setCookie(res, 'haunt_sid', sid, 86400); setCookie(res, 'haunt_sig', sign(sid), 86400); setCookie(res, 'oauth_state', '', 0, 'None');
-      res.redirect(303, '/register');
-    } catch (e) { res.status(400).send(`<p>Sign-in failed: ${String(e.message).replace(/[<>&]/g, '')}</p><p><a href="/register">Back</a></p>`); }
+      const ret = handoffUrl(cookies(req).oauth_return); setCookie(res, 'oauth_return', '', 0, 'None');
+      res.redirect(303, ret ? `${ret}#haunt_session=${sid}.${sign(sid)}` : '/register');
+    } catch (e) {
+      const back = handoffUrl(cookies(req).oauth_return) || '/register';
+      res.status(400).send(`<p>Sign-in failed: ${String(e.message).replace(/[<>&]/g, '')}</p><p><a href="${back.replace(/[<>&"]/g, '')}">Back</a></p>`);
+    }
   };
   app.get('/auth/:provider/callback', callback);
   app.post('/auth/:provider/callback', callback);

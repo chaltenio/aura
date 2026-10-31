@@ -1,0 +1,14 @@
+// Base44 project file for the HAUNT frontend mirror, https://aura-haunt.base44.app (app 6ae6701d773bec7f249e1409).
+// The pages are web/; scripts/base44.mjs builds them into dist/base44 pointed at the Fly API. Deploys run from
+// .github/workflows/deploy.yml (`node scripts/base44.mjs deploy`); by hand, either of:
+//   node scripts/base44.mjs deploy
+//   BASE44_APP_ID=6ae6701d773bec7f249e1409 npx base44 site deploy --build -y
+// No entities, functions or Base44 auth: the API, data and face matching stay on Fly and on the phone.
+{
+  "name": "HAUNT",
+  "description": "Point your phone at someone in the room and know who they are. Opt-in, on-device face-to-profile for events.",
+  "site": {
+    "outputDirectory": "./dist/base44",
+    "buildCommand": "node scripts/base44.mjs build"
+  }
+}
