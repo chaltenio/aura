@@ -165,6 +165,7 @@ on a `gallery_changed` socket message).
 | GET | `/api/gallery` | `[{id, name, handle, descriptors}]` for consenting attendees only. Avatars are a separate lazy endpoint |
 | GET | `/api/attendee/:id/card` | name, handle, avatar URL, blurb, GitHub "this week" summary |
 | POST | `/api/haunt` | `{targetId, similarity}` -> writes event, pushes `haunted` to target socket, returns the target card |
+| GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | WS | `/ws?attendee=<id>` | server -> phone: `haunted`, `gallery_changed`, `state` (roles/scores) |
 
 Rate-limit haunts per pair (one per 60 s) so a phone pointed at someone does not

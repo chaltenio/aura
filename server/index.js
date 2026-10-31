@@ -108,14 +108,25 @@ app.get('/api/attendee/:id', async (req, res) => {
   res.json(publicCard(a));
 });
 
-// me: card + haunts, needs token
+// me: card + haunts + tonight's connections (one row per person), needs token.
+// Consent is a server-side filter: a counterpart who is gone or opted out is left out of all three lists.
 app.get('/api/me/:id', async (req, res) => {
   const a = byId(req.params.id);
   if (!a || a.token !== req.query.token) return res.status(403).json({ error: 'forbidden' });
   await ensureProfile(a, save).catch(() => {});
-  const received = db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).map((e) => ({ ...e, by: publicCard(byId(e.actorId) || { id: '?', name: 'unknown' }) }));
-  const given = db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).map((e) => ({ ...e, target: publicCard(byId(e.targetId) || { id: '?', name: 'unknown' }) }));
-  res.json({ me: publicCard(a), received: received.reverse(), given: given.reverse() });
+  const received = [], given = [], conns = new Map(); // otherId -> { card, youHaunted, hauntedYou, lastAt }
+  for (const e of db.events) {
+    const mine = e.actorId === a.id;
+    if (e.type !== 'haunt' || mine === (e.targetId === a.id)) continue; // not about me (or a self-haunt)
+    const other = byId(mine ? e.targetId : e.actorId);
+    if (!other || other.consent !== true) continue;
+    let c = conns.get(other.id);
+    if (!c) conns.set(other.id, c = { card: publicCard(other), youHaunted: 0, hauntedYou: 0, lastAt: 0 });
+    if (mine) { c.youHaunted++; given.push({ ...e, target: c.card }); } else { c.hauntedYou++; received.push({ ...e, by: c.card }); }
+    c.lastAt = Math.max(c.lastAt, e.createdAt || 0);
+  }
+  const connections = [...conns.values()].sort((x, y) => y.lastAt - x.lastAt);
+  res.json({ me: publicCard(a), received: received.reverse(), given: given.reverse(), connections });
 });
 
 // kill switch

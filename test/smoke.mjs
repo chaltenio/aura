@@ -66,6 +66,24 @@ try {
   // kill switch removes Bob from the gallery
   check((await json(`/api/attendee/${b.id}`, { method: 'PATCH', body: { token: b.token, consent: false } })).status === 200, 'PATCH consent');
   check((await json('/api/gallery')).data.length === 1, 'opted-out attendee leaves the gallery');
+
+  { // tonight's connections on /me: one row per person, both directions, consenting counterparts only (fresh attendees)
+    const reg = async (name) => (await json('/api/attendee', { method: 'POST', body: { name, handle: name.toLowerCase(), consent: true, descriptors: [vec()], linkedin: `https://www.linkedin.com/in/${name.toLowerCase()}` } })).data;
+    const cy = await reg('Cy'), di = await reg('Di'), ed = await reg('Ed');
+    const haunt = async (x, y) => { await new Promise((r) => setTimeout(r, 5)); return (await json('/api/haunt', { method: 'POST', body: { actorId: x.id, token: x.token, targetId: y.id } })).status; };
+    check(await haunt(cy, di) === 200 && await haunt(di, cy) === 200 && await haunt(ed, cy) === 200, 'connections: setup haunts succeed');
+    const cyMe = async () => (await json(`/api/me/${cy.id}?token=${cy.token}`)).data;
+    const row = (m, x) => m.connections?.find((c) => c.card.id === x.id);
+    const m1 = await cyMe();
+    check(m1.connections?.length === 2 && m1.received?.length === 2 && m1.given?.length === 1, '/me connections: one row per person');
+    check(row(m1, di)?.youHaunted === 1 && row(m1, di)?.hauntedYou === 1 && row(m1, ed)?.youHaunted === 0 && row(m1, ed)?.hauntedYou === 1, '/me connections: counts both directions');
+    check(m1.connections?.[0]?.card.id === ed.id && row(m1, ed)?.lastAt === m1.received?.[0]?.createdAt && row(m1, di)?.lastAt === m1.received?.[1]?.createdAt, '/me connections: newest first, lastAt is the latest haunt either way');
+    check(row(m1, di)?.card.linkedin === 'https://www.linkedin.com/in/di' && !('token' in (row(m1, di)?.card || {})), '/me connections: public card, no token');
+    check((await json(`/api/attendee/${di.id}`, { method: 'PATCH', body: { token: di.token, consent: false } })).status === 200, 'connections: Di opts out');
+    const m2 = await cyMe();
+    check(m2.connections?.length === 1 && !row(m2, di), 'opted-out counterpart leaves /me connections');
+    check(m2.received?.length === 1 && m2.received[0].by.id === ed.id && m2.given?.length === 0, 'opted-out counterpart leaves /me received and given');
+  }
   ws.close();
 } catch (e) { fails.push('exception: ' + (e.stack || e)); }
 finally { server.kill(); }
