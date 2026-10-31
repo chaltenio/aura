@@ -4,16 +4,31 @@ export const getMe = () => { try { return JSON.parse(localStorage.getItem(ME_KEY
 export const setMe = (me) => { try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch {} };
 export const clearMe = () => { try { localStorage.removeItem(ME_KEY); } catch {} };
 
+// Where the API and /ws live. '' = this origin (Fly serves pages and API together). The Base44 mirror
+// (scripts/base44.mjs) puts window.HAUNT_API = the Fly URL in every page's <head>, so the same pages call the Fly
+// API and socket cross-origin and both URLs share one room. Call the API only through api() / API + path.
+export const API = String(globalThis.HAUNT_API || '').replace(/\/+$/, '');
+// Cross-origin sign-in: a cookie on the API's domain would be a third-party cookie here, so the OAuth callback hands
+// the session back in the URL fragment (#haunt_session=...; server/auth.js) and api() sends it as a header.
+const SESSION_KEY = 'haunt.session';
+const getSession = () => { try { return localStorage.getItem(SESSION_KEY) || ''; } catch { return ''; } };
+{ const m = location.hash.match(/^#haunt_session=([\w-]+\.[\w-]+)$/); if (m) { try { localStorage.setItem(SESSION_KEY, m[1]); } catch {} history.replaceState(null, '', location.pathname + location.search); } }
+/** Href that starts OAuth sign-in with `provider` and comes back to this page signed in, on either origin. */
+export const signInHref = (provider) => `${API}/auth/${encodeURIComponent(provider)}${API ? `?return=${encodeURIComponent(location.origin + location.pathname)}` : ''}`;
+
 export async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const headers = body ? { 'content-type': 'application/json' } : {};
+  // only where the server reads the session (writes, /api/session*), so plain GETs stay simple requests with no preflight
+  const sess = getSession(); if (sess && (method !== 'GET' || path.startsWith('/api/session'))) headers['x-haunt-session'] = sess;
+  const res = await fetch(API + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { const err = new Error(data.error || res.statusText); err.status = res.status; err.data = data; throw err; }
   return data;
 }
 
 export function connectWs(params, onMessage) {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${proto}://${location.host}/ws?${new URLSearchParams(params)}`;
+  const base = new URL(API || location.origin);
+  const url = `${base.protocol === 'https:' ? 'wss' : 'ws'}://${base.host}/ws?${new URLSearchParams(params)}`;
   let ws, closed = false, delay = 500;
   const open = () => {
     ws = new WebSocket(url);

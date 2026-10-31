@@ -1,5 +1,6 @@
 import { api, connectWs, esc, fmtTime } from '/common.js';
 import { presence } from '/presence.js';
+import { renderScout } from '/scout.js';
 const $ = (id) => document.getElementById(id);
 const joinUrl = location.origin + '/register';
 const q = qrcode(0, 'M'); q.addData(joinUrl); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2 });
@@ -25,10 +26,11 @@ function renderOnline() {
   $('online-now').innerHTML = on.map((a) => `<span class="on-face">${av(a)}<span>${esc(String(a.name).trim().split(/\s+/)[0])}</span></span>`).join('');
 }
 addEventListener('presencechange', renderOnline);
-async function load() { const d = await api('/api/events?limit=200'); events = d.events; attendees = d.attendees; render(); }
+async function load() { const d = await api('/api/events?limit=200'); events = d.events; attendees = d.attendees; render(); renderScout(d.scout); }
 await load();
 // attendee_gone: someone turned findable off, so the headcount drops now (attendee_changed alters nothing shown here)
 connectWs({ screen: '1' }, (msg) => {
   if (msg.type === 'event') { events.unshift(msg.event); freshId = msg.event.id; render(); }
+  if (msg.type === 'scout') renderScout(msg.scout);
   if (msg.type === 'joined' || msg.type === 'gallery_changed' || msg.type === 'attendee_gone') load();
 });

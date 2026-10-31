@@ -88,8 +88,8 @@ flowchart LR
   gh["GitHub release facex-engine/facex v1.0.0<br/>edgeface_xs_fp32.bin, det_500m_int8.bin"]
   gh -. "ensureWeights() on first start" .-> stat
 
-  wsrv -. "push: hello, gallery_changed, attendee_changed, attendee_gone, presence, haunted" .-> common
-  wsrv -. "push: hello, gallery_changed, attendee_gone, presence, joined, event" .-> screen
+  wsrv -. "push: hello, gallery_changed, attendee_changed, attendee_gone, presence, haunted, state {scout}" .-> common
+  wsrv -. "push: hello, gallery_changed, attendee_gone, presence, joined, event, scout" .-> screen
 
   style engine stroke:#7CFF6B,stroke-width:3px,stroke-dasharray:6 4
   style phones stroke:#7CFF6B,stroke-width:2px

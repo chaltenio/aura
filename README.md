@@ -20,6 +20,9 @@ npm test             # API smoke test
 scripts/deploy.sh    # Fly.io (see docs/DEPLOY.md)
 ```
 
+Live: https://aura-haunt.fly.dev. The same pages are mirrored on Base44 at https://aura-haunt.base44.app; they call
+the Fly API and socket, so phones on either URL are in one room (`node scripts/base44.mjs deploy`, docs/DEPLOY.md).
+
 Pages: `/register` (LinkedIn photo or 3 selfies, + consent), `/hunt` (camera -> card -> haunt), `/me` (your card, kill switch),
 `/screen` (big screen), `/enroll` (organizer: CSV + photos), `/calibrate` (threshold tuning).
 Optional sign-in appears when `GITHUB_CLIENT_ID/SECRET` or `LINKEDIN_CLIENT_ID/SECRET` are set (see docs/SECRETS.md).

@@ -12,6 +12,8 @@ import { ensureProfile, profileLoading } from './profile.js';
 import { mountAdmin } from './admin.js';
 import { deployInfo } from './version.js';
 import { mountPresence } from './presence.js';
+import { mountScout } from './scout.js';
+import { cors } from './cors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -75,12 +77,15 @@ const cardChanged = (a) => { save(); pushCard(a); }; // a GitHub lookup landed o
 
 // ---------- app ----------
 const app = express();
+app.use('/api', cors); // the Base44 mirror of web/ calls the API cross-origin (server/cors.js, FRONTEND_ORIGINS)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
 if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
 
 mountAuth(app);
-const admin = mountAdmin(app, { db, byId, save, sendTo, broadcast, broadcastScreen, isOnline: (id) => [...(sockets.get(id) || [])].some((ws) => ws.readyState === 1) });
+const isOnline = (id) => [...(sockets.get(id) || [])].some((ws) => ws.readyState === 1);
+const admin = mountAdmin(app, { db, byId, save, sendTo, broadcast, broadcastScreen, isOnline });
+const scout = mountScout(app, { db, byId, save, sendTo, broadcastScreen, publicCard, dataDir: DATA_DIR, isOnline }); // the Scout (docs/scout/README.md): POST /api/rating, match events, state { scout } clues
 
 // register. A signed-in session (GitHub/LinkedIn/Google/Apple) supplies provider, id, avatar and defaults; otherwise 'manual' or 'csv'.
 app.post('/api/attendee', (req, res) => {
@@ -180,15 +185,15 @@ app.post('/api/haunt', (req, res) => {
   const now = Date.now();
   const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now, meetupId: admin.activeMeetup()?.id || null, ...(back && { back: true }) };
   db.events.push(ev); save();
-  sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now, ...(back && { back: true }) });
+  sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now, hauntId: ev.id, ...(back && { back: true }) }); // hauntId: the rating buttons name this haunt
   broadcastScreen({ type: 'event', event: { ...ev, actor: publicCard(actor), target: publicCard(target) } });
-  res.json({ ok: true, card: publicCard(target) });
+  res.json({ ok: true, card: publicCard(target), hauntId: ev.id });
 });
 
 app.get('/api/events', (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 500);
   const events = db.events.slice(-limit).reverse().map((e) => ({ ...e, actor: publicCard(byId(e.actorId) || { id: '?', name: 'unknown' }), target: publicCard(byId(e.targetId) || { id: '?', name: 'unknown' }) }));
-  res.json({ events, attendees: db.attendees.filter((a) => a.consent && !a.blocked).map(publicCard) });
+  res.json({ events, attendees: db.attendees.filter((a) => a.consent && !a.blocked).map(publicCard), scout: scout.state() }); // scout: first paint of the /screen panel
 });
 
 // ---------- websockets ----------

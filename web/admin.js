@@ -1,9 +1,9 @@
-import { esc, fmtTime } from '/common.js';
+import { esc, fmtTime, API } from '/common.js';
 const $ = (id) => document.getElementById(id);
 let token = ''; try { token = sessionStorage.getItem('haunt.admin') || ''; } catch {}
 let users = [];
 async function call(path, method = 'GET', body) {
-  const r = await fetch('/api/admin' + path, { method, headers: { 'x-admin-token': token, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(API + '/api/admin' + path, { method, headers: { 'x-admin-token': token, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(d.error || r.statusText), { status: r.status });
   return d;
