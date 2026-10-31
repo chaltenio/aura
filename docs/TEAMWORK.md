@@ -80,3 +80,11 @@ So the bus is the thing everyone already has: **a pinned GitHub issue, read and 
 - Join in under five minutes, no new accounts: be a collaborator on the repo, have `gh auth login` done, clone, `npm install`, open `claude`. The hook does the rest.
 
 Ruled out for today: a repo-hosted MCP server (`claude mcp add` per person plus an auth story, and it would just wrap the same `gh` calls), GitHub Discussions (disabled on the repo), Slack or Discord webhooks (accounts, and one more place to look). If the hackathon runs past today, the MCP server is the upgrade: same `bus.sh` verbs as tools, so agents call `claim_task` instead of shelling out.
+
+## 8. Why we switched from direct-to-main to branches (13:40)
+
+Direct-to-main works when two people touch different files. Within the first hour we had three Claude Code sessions on one laptop editing `web/face.js`, `server/index.js`, and the docs at once, plus a fork committing beside them. Edits landed on top of each other's uncommitted work and rebases were impossible with a dirty tree.
+
+The rule now: every session on its own branch `<name>/<task>`, pushed after every commit, landed through `/merge`. `main` only ever moves by fast-forward from a rebased branch, so it is always one person's tested state. The merge resolver (`.claude/skills/merge/SKILL.md`) does the rebase and reads both sides of every conflict instead of picking one; the semantic-conflict checklist there is the part humans skip under time pressure. The integrator lists branches away from main and nudges anyone past 45 minutes.
+
+Cost: one more step before your work is visible on main. Benefit: nobody's working tree is touched by anyone else, ever.

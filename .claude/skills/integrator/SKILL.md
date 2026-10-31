@@ -25,28 +25,41 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    ```
    If there is nothing new on main, no open PR changed, and nothing new on the bus, append `no change` to the log line and stop the pass early.
 
-2. **Bring the integrator worktree up to date** (never touch the human's working tree):
+2. **List branches ahead of main and nudge stale ones.**
+   ```bash
+   for b in $(git branch -r --no-merged origin/main | grep -v HEAD); do
+     echo "$b ahead=$(git rev-list --count origin/main..$b) last=$(git log -1 --format=%cr $b) diverged=$(git log -1 --format=%cr $(git merge-base origin/main $b))"
+   done
+   ```
+   A branch that diverged from main more than ~45 minutes ago, or whose last commit is older than 45 minutes with unmerged work, gets a nudge on the bus: `scripts/bus.sh post "@<owner> <branch> has been away from main for <time>; run /merge when the next step works"`. Owner = the `<name>/` prefix. Two branches touching the same file (`git diff --name-only origin/main...<b>` overlaps) get named together so the first to `/merge` warns the second.
+
+3. **Bring the integrator worktree up to date** (never touch the human's working tree):
    ```bash
    git pull --rebase --autostash -q origin main
    ```
    The integrator tab should run from its own worktree (`EnterWorktree` or `git worktree add ../haunt-integrator main`) so a teammate's uncommitted edits are never stashed.
 
-3. **Run the smoke test** if `package.json` has a `test` script: `npm test --silent`. Otherwise `node --check server/index.js` and `curl -fsS localhost:3000/api/gallery` if a server is running. Record pass/fail.
+4. **Run the smoke test** if `package.json` has a `test` script: `npm test --silent`. Otherwise `node --check server/index.js` and `curl -fsS localhost:3000/api/gallery` if a server is running. Record pass/fail.
 
-4. **Read every new commit's diff** (`git show --stat <sha>`, then `git show <sha> -- <file>` for anything under `server/` or `web/`). Check, in this order:
+5. **Read every new commit's diff** (`git show --stat <sha>`, then `git show <sha> -- <file>` for anything under `server/` or `web/`). Check, in this order:
    - **Contract drift:** a route, payload field, or WebSocket event name that differs from ARCHITECTURE.md. Either the doc or the code is wrong; name which.
-   - **Ownership collisions:** two different authors touched the same file since the last pass, or a commit touched a file whose TODO.md owner is someone else.
+   - **Ownership collisions:** two different authors touched the same file since the last pass, or a commit touched a file whose TODO.md owner is someone else. Direct commits to `main` that did not come through `/merge` (author is not the merge resolver, no `merged <branch>` bus post): name them; main is `/merge`-only.
    - **Silent clean merges:** a rebase that dropped a change (search the diff for functions that disappeared without a replacement).
    - **Rule breaks:** face images or embeddings sent to any hosted model; `data/`, `.env`, weights, or `node_modules` committed; a force-push (`git reflog show origin/main` shows a non-fast-forward).
    - **Shelled PRs:** description has a run link; EDGE_CASES.md gained an entry for anything the agents broke.
 
-5. **Update TODO.md.** Rewrite only the `## STATUS` paragraph (date, what is on main and working, what is broken, who is blocked). Tick tasks that landed. Do not reassign tasks; ask the owner instead.
+6. **Update TODO.md.** Rewrite only the `## STATUS` paragraph (date, what is on main and working, what is broken, who is blocked). Tick tasks that landed. Do not reassign tasks; ask the owner instead.
 
-6. **Answer the bus.** For every new `[ASK]` since the last pass, reply with `scripts/bus.sh answer "<quote the ask> -> <answer>"` if the answer is in ARCHITECTURE.md, TODO.md, or the code; otherwise name who should answer. For every `[CLAIM]`, check TODO.md has the owner; if two people claimed the same file, say so on the bus. Treat `[DECIDE]` lines as standing orders and copy them into TODO.md Decisions.
+7. **Answer the bus.** For every new `[ASK]` since the last pass, reply with `scripts/bus.sh answer "<quote the ask> -> <answer>"` if the answer is in ARCHITECTURE.md, TODO.md, or the code; otherwise name who should answer. For every `[CLAIM]`, check TODO.md has the owner; if two people claimed the same file, say so on the bus. Treat `[DECIDE]` lines as standing orders and copy them into TODO.md Decisions.
 
-7. **Log and speak.**
+8. **Log and speak.**
    - Append one line to `docs/INTEGRATION_LOG.md` in the documented format.
-   - `git add TODO.md docs/INTEGRATION_LOG.md && git commit -qm "integrator: <HH:MM> digest" && git push -q origin main` (pull --rebase first if rejected).
+   - Commit on the integrator's own branch and fast-forward main with only these two files (the integrator and `/merge` are the only writers to main):
+     ```bash
+     git switch -c integrator/log 2>/dev/null || git switch -q integrator/log
+     git add TODO.md docs/INTEGRATION_LOG.md && git commit -qm "integrator: <HH:MM> digest"
+     git rebase -q origin/main && git push -q origin HEAD:main
+     ```
    - `git rev-parse origin/main > .integrator-last` (this file is gitignored).
    - Post the same three lines to the bus: `scripts/bus.sh digest "<landed> | <red or colliding> | <who does what next>"`.
    - Say them in chat too. Name people. No praise, no filler.
