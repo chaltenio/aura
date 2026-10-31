@@ -10,11 +10,28 @@ both people get each other's profile.
 
 No app install. One URL, works in iOS Safari and Android Chrome.
 
+## Run it
+
+```
+npm install
+npm start            # http://localhost:3000  (needs HTTPS on phones: use the tunnel or Fly)
+npm run tunnel       # prints a public https://*.trycloudflare.com URL for phones
+npm test             # API smoke test
+scripts/deploy.sh    # Fly.io (see docs/DEPLOY.md)
+```
+
+Pages: `/register` (3 selfies + consent), `/hunt` (camera -> card -> haunt), `/me` (your card, kill switch),
+`/screen` (big screen), `/enroll` (organizer: CSV + photos), `/calibrate` (threshold tuning).
+Optional sign-in appears when `GITHUB_CLIENT_ID/SECRET` or `LINKEDIN_CLIENT_ID/SECRET` are set (see docs/SECRETS.md).
+
 ## Docs
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): the core "recognize faces in a space" feature.
 - [RESEARCH.md](RESEARCH.md): open-source prior art and sponsor-track notes.
 - [EDGE_CASES.md](EDGE_CASES.md): where the coding agents sweated (Shelled AI track).
+- [docs/DEMO.md](docs/DEMO.md): 2-minute demo script, pitch, numbers.
+- [docs/SHELLED_RUNS.md](docs/SHELLED_RUNS.md): prompts for the Shelled runs.
+- [docs/DEPLOY.md](docs/DEPLOY.md), [docs/SECRETS.md](docs/SECRETS.md), [docs/TEAMWORK.md](docs/TEAMWORK.md), [IDEAS.md](IDEAS.md).
 
 ## Layers (build in this order)
 
