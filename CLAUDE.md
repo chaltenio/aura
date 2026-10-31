@@ -3,6 +3,12 @@
 Point your phone at someone in the room and know who they are. Opt-in, on-device face-to-profile for events.
 Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing what).
 
+## Where to find work
+- **IDEAS.md section 3** ("Ideas that fit and are free for another teammate to take"): the backlog of pickable, independent features, each with effort and sponsor track. Start there.
+- **TODO.md** Now/Next: what is claimed and by whom; Done: what landed. STATUS at the top is the one-paragraph truth.
+- **docs/SHELLED_RUNS.md**: the three Shelled prompts. The Shelled track needs 2 Shelled PRs (1 merged) plus EDGE_CASES.md.
+- **docs/DEMO.md**: what we show the judges. Nothing lands in the last 30 minutes that is not on it.
+
 ## Where things live
 - `server/` Node + Express + ws, JSON-file storage in `data/` (gitignored). One process, port 3000.
 - `web/` static pages: `register`, `hunt`, `me`, `screen`, `calibrate`. Shared: `face.js` (engine), `common.js`.
@@ -15,14 +21,15 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - One logical change per commit. Commit as soon as a step works; never batch an hour of work.
 - Message style: `area: what changed` (e.g. `hunt: 3-frame vote before showing card`). Body only if the why is not obvious.
 - Stage explicitly (`git add <paths>`), never `git add -A`.
-- Push your branch after every atomic commit with `scripts/sync.sh` (it pushes `origin HEAD` on a branch and refuses on `main`). Never let work sit unpushed more than 15 minutes or across a context switch; before leaving the keyboard, push.
-- Ready to land? Run `/merge`. It rebases your branch onto `origin/main`, resolves conflicts keeping both sides' intent, runs the test, fast-forwards `main`, deletes the branch, and posts to the bus. Do not merge by hand.
+- Rebase on main often: `scripts/sync.sh` (pulls your branch with `--rebase --autostash`, rebases it onto `origin/main`, runs the test, pushes `origin HEAD`; refuses on `main`) before starting a chunk, after every commit, and at least every 15 minutes. Never work more than 15 minutes on a stale base; never let work sit unpushed across a context switch; before leaving the keyboard, push.
+- When your branch is done: `scripts/bus.sh ready "<branch>: what it does"` (the integrator merges it within a pass) or run `/merge` yourself. Both rebase onto `origin/main`, resolve conflicts keeping both sides' intent, run the test, fast-forward `main`, delete the branch and post `[MERGED]`. Never merge by hand.
+- Hooks enforce this (`.claude/settings.json`): an edit while on `main` is blocked with "On main: run /start to claim a task and create your branch"; after about 3 commits or 30 minutes on a branch the commit hook asks whether to merge back; every commit posts `[COMMIT]` and every tenth minute of prompting posts `[WORKING]` to the bus; stopping with unpushed work prints a reminder.
 - Never force-push a shared branch, never rewrite `main`, never commit `data/`, `.env`, weights, or `node_modules`.
 - If `npm test` fails on `main`, fixing it is the next thing anyone does. Say so on the bus.
 - End commit messages with the Co-Authored-By line when an agent wrote the change.
 
 ## Working in parallel
-- New session: run `/start` (greets with the state of the room, claims, branches). Never edit before claiming.
+- New session: `/start` runs by itself (state of the room, the top picks from IDEAS.md section 3, then it claims and branches, or continues your existing branch). Never edit before claiming.
 - Claim a task in TODO.md (put your name in the Owner column) before starting; tick it when it is on main.
 - One owner per file at a time. Touching someone else's file: tell them first, keep the diff tiny.
 - Agents: one git worktree and one branch per task (`EnterWorktree` or `git worktree add`), landed with `/merge`, deleted when done.
