@@ -50,3 +50,48 @@ Researched 2026-10-31. Each section ends with a "use this" call.
 ### Use this
 
 Next.js (or Vite) pages + Auth.js (LinkedIn OIDC + GitHub, store picture bytes) + a ~150-line **Socket.IO** server on Fly/Railway or a laptop with Cloudflare Tunnel as the single game-state authority. Fork EpiConsole's QR-join layout, not its games. One Join tap unlocks audio, requests orientation permission, and takes a wake lock. Badge QR via `qr-scanner` as the identity fallback when face match fails; optional NTAG213 stickers pointing at the same `/j/<code>` URL.
+
+---
+
+## B. Set dressing: room scan, marker AR, data over sound
+
+### Room scan to big screen
+
+| Tool | Facts | Verdict |
+|---|---|---|
+| **Scaniverse** (Niantic, free) | Splat mode works **without LiDAR** (toggle "Ignore Lidar"; iPhone 12+ safest). Exports SPZ or PLY, mesh GLB/OBJ/USDZ. A 60 to 120 s room scan is ~10 to 40 MB SPZ (SPZ is ~10x smaller than PLY). https://scaniverse.com/spz , https://scaniverse.com/news/scaniverse-2-0-adds-support-for-non-lidar-devices , SPZ format https://github.com/nianticlabs/spz (MIT) | **use this** |
+| Polycam | Free tier exports mesh only; splat PLY is paid. https://learn.poly.cam/hc/en-us/articles/27756102599572 | skip |
+| **Spark** (World Labs) | three.js splat renderer, loads SPZ/PLY/SPLAT/KSPLAT/SOG, explicit mobile target. 3.8k stars, MIT, pushed 2026-10-20, npm `@sparkjsdev/spark` 2.4.0, needs three r180+. https://github.com/sparkjsdev/spark , https://sparkjs.dev/docs/overview/ | **use this** |
+| GaussianSplats3D | No longer developed, README points to Spark. https://github.com/mkkellogg/GaussianSplats3D | skip |
+| gsplat.js | .splat/.ply only. https://github.com/huggingface/gsplat.js | skip |
+| **SuperSplat** (PlayCanvas) | Hosted editor imports PLY/SPZ, crop junk, export SPZ or a standalone HTML viewer. 10.5k stars, MIT. https://superspl.at/editor , https://github.com/playcanvas/supersplat | 5-min cleanup step |
+| Babylon.js | Loads .spz in v8+; lower phone fps than Spark. https://doc.babylonjs.com/features/featuresDeepDive/mesh/gaussianSplatting | only if already on Babylon |
+
+**Plan:** Scaniverse -> SPZ -> (SuperSplat crop) -> Spark `SplatMesh` in three.js on `/screen`. Event markers are three.js sprites at hand-placed coordinates, pushed over the existing socket. About 1 hour, and it's the visual showpiece.
+
+### Marker / image AR that works in iOS Safari (no install)
+
+- **AR.js** — 6k stars, MIT, pushed 2026-06. **Pattern markers (black square fiducials) are the most robust in dim light** because they threshold, not feature-match. NFT image mode is flaky on iOS. https://github.com/AR-js-org/AR.js
+- **MindAR** — 2.8k stars, MIT, image targets compiled in-browser to `.mind`, A-Frame and three.js builds, works in Safari. Last push 2024-06. Loses lock in low light and glare: use high-contrast matte sigils, raise `missTolerance`, keep lights on near posters. https://github.com/hiukim/mind-ar-js , compiler https://hiukim.github.io/mind-ar-js-doc/tools/compile
+- **8th Wall open source** (2026-02-28) — https://github.com/8thwall/8thwall (MIT glue + examples); the XR engine itself is a free **binary** npm package `@8thwall/engine-binary`, image targets live in its SLAM chunk. Best tracking of the three, no account needed, but a large unfamiliar API for a 4-hour window. https://8thwall.org/docs/engine/overview
+- Zappar: stale since 2023, licence tied to ZapWorks. Skip. WebXR image tracking: still not in iOS Safari. Skip.
+
+**Plan:** sigil posters = AR.js pattern marker (or MindAR target) with a **QR code printed on every poster** as the guaranteed fallback. One page shows a ghost and POSTs the zone.
+
+### Data over sound (ghost throw)
+
+- **ggwave** — 7.9k stars, MIT, pushed 2026-04, npm `ggwave` 0.4.0 (wasm). Max 140-byte payload, ~8 to 16 B/s. Demos https://waver.ggerganov.com , https://ggwave-js.ggerganov.com . https://github.com/ggerganov/ggwave
+- iOS gotchas: do **not** force `AudioContext({sampleRate:48000})`; create the context on a tap and pass `ctx.sampleRate` to ggwave. **Safari filters ultrasound**, so use `AUDIBLE_FAST` on iOS. https://github.com/ggerganov/ggwave/issues/5
+- Reliability: a 2026 measurement paper found audible mode unusable in café-level noise beyond ~1 m. In a loud hackathon room expect phone-to-phone at arm's length only. https://arxiv.org/html/2602.02249v1
+- Gibberlink = ggwave + ElevenLabs, nothing extra. Chirp SDK is dead.
+
+**Plan:** stretch demo only: audible-fast, ~20-byte payload, phones held together, tap-to-arm. Server-side fallback: "both phones shaken within 2 s" = a throw.
+
+### Simple fallbacks
+
+- QR per zone with `?zone=X`: native camera apps scan it, zero code. In-page scanning: BarcodeDetector is off in iOS Safari, use `qr-scanner`/jsQR/zxing-wasm.
+- Compass: `DeviceOrientationEvent.requestPermission()` from a tap, then `event.webkitCompassHeading` on iOS (Android: `360 - alpha` with absolute). Permission persists per origin. ~20 lines for a "point your phone" effect. https://developer.apple.com/forums/thread/128376
+
+### Use this / skip
+
+Do: Scaniverse scan during setup, Spark on the big screen, AR.js or MindAR sigils with QR fallback, compass effect. Skip: 8th Wall, Polycam, GaussianSplats3D, Zappar, ultrasound. ggwave throw is a stretch demo.
