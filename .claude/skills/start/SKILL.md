@@ -77,5 +77,5 @@ git add TODO.md && git commit -qm "todo: $name claims $task" && scripts/sync.sh 
 
 - Commit each working step; `scripts/sync.sh` after every commit (pushes your branch; 15-minute rule).
 - `scripts/bus.sh post` when something others should know lands; `scripts/bus.sh ask` when stuck.
-- `scripts/bus.sh ready` (the integrator merges it) or `/merge` when the slice is demoable. Never edit on `main`; never edit before claiming.
+- When the slice works, your Claude runs `scripts/ready.sh` without being asked: test, push, open the PR, post `[READY]`; the integrator lands it (or `/merge` to land it now) and GitHub shows the PR merged. Never edit on `main`; never edit before claiming.
 - Changed your plan? Post a new `[PLAN]` line; silent scope drift is how two people end up building the same thing.
