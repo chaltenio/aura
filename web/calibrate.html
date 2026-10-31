@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0a10"><link rel="icon" href="/favicon.svg">
 <title>HAUNT · Calibrate</title><link rel="stylesheet" href="/app.css">
-<style>table{border-collapse:collapse;font-family:ui-monospace,Menlo,monospace;font-size:12px} td,th{border:1px solid #2a2738;padding:4px 6px;text-align:right} th{color:var(--mute)} td.hi{background:#1d4d1d} td.mid{background:#4d3a10} th.row{text-align:left}</style></head>
+<style>table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums} td,th{border:1px solid var(--line);padding:5px 7px;text-align:right;white-space:nowrap} th{color:var(--mute);font-weight:600} td.hi{background:#1d4d1d;color:#d9ffd4} td.mid{background:#4d3a10} td.self{color:#5d5670} th.rh{text-align:left} th.rh img{width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px}</style></head>
 <body>
-<h1><span class="ghost">👻</span> Calibrate</h1>
-<p class="mute">Drop several photos (same people from different angles, plus strangers). Shows pairwise similarity so you can pick the threshold for this room's lighting. Nothing is uploaded.</p>
-<div class="panel"><input id="files" type="file" accept="image/*" multiple><div class="status" id="status">Loading face model…</div></div>
+<header class="top"><a class="brand" href="/">👻 HAUNT</a><a class="top-link" href="/screen">Screen</a></header>
+<h1>Calibrate</h1>
+<p class="mute">Add several photos: the same people from different angles, plus strangers. The table shows how alike every pair of faces is, so you can pick the threshold for this room's light. Nothing is uploaded.</p>
+<div class="panel"><label class="btn secondary" for="files">Add photos</label><input id="files" class="visually-hidden" type="file" accept="image/*" multiple><div class="status" id="status">Loading face model…</div></div>
 <div class="panel" style="overflow:auto"><table id="matrix"></table></div>
-<p class="hint">Green ≥ threshold (<span id="t"></span>), amber = abstain band. <a href="/">Home</a></p>
+<p class="hint">Green: same person (at or above the threshold, <span id="t"></span>). Amber: not sure, so no name is shown. Numbers are similarity in percent.</p>
 <script type="module" src="/calibrate.js"></script>
 </body></html>
