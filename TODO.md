@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 13:05 PT.** Repo is on GitHub (chaltenio/aura, created 12:38 PT today, non-fork). On `main`: docs (README, ARCHITECTURE, RESEARCH, EDGE_CASES template, CLAUDE.md, TEAMWORK, integrator skill). The main session is finishing the face-engine swap to FaceX in `web/` and `server/` (uncommitted, landing shortly). Nothing deployed yet; local server + cloudflared tunnel only. No Shelled run has been made yet. Nobody is blocked. Backlog lives in IDEAS.md section 3.
+**2026-10-31 13:47 PT.** On `main` (6da13ca), `npm test` green: FaceX hybrid engine default in `web/face.js`, Express + ws server with gallery, haunt push, cooldown and kill switch, API smoke test in `test/smoke.mjs` (no browser e2e yet), GitHub/LinkedIn/Google/Apple sign-in behind env vars, Dockerfile + fly.toml + `scripts/deploy.sh`, CI on every push, branch-first hooks, `/start`, bus `ready`/`merged`, IDEAS.md backlog. Not deployed: `FLY_API_TOKEN` is not a repo secret, so the deploy job skips on every push to main and aura-haunt.fly.dev does not resolve (#4, main session). No Shelled run yet; EDGE_CASES.md is still the template (#6/#7, tarecq). No branch is ahead of main, no open PR, nobody blocked. Integrator loop runs every 5 min from `../aura-integrator`.
 
 ## Now (this hour)
 
@@ -22,7 +22,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 | # | Task | Owner | Done |
 |---|------|-------|------|
-| 8 | GitHub OAuth, then LinkedIn OIDC (store picture bytes, not the URL) on `/register` | | [ ] |
+| 8 | GitHub OAuth, then LinkedIn OIDC (store picture bytes, not the URL) on `/register` | main session (GitHub/LinkedIn), Chris (Google/Apple) | [x] |
 | 9 | Decide the second track: Fetch.ai matchmaker (lower risk) vs TrueForge Demogorgon (higher payoff). Record the decision here | | [ ] |
 | 10 | Fetch.ai: matchmaker uAgent on Agentverse (mailbox), 3 tries through ASI:One, one change from feedback | | [ ] |
 | 11 | Roles on join (Hunter / Ghost / Medium / Possessed) and role-gated views | | [ ] |
