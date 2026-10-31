@@ -157,7 +157,9 @@ on a `gallery_changed` socket message).
 
 | Method | Path | Body / returns |
 |---|---|---|
-| GET | `/auth/github`, `/auth/linkedin` | OAuth redirect; sets session cookie |
+| GET | `/auth/github`, `/auth/linkedin`, `/auth/google`, `/auth/apple` | OAuth redirect; sets session cookie. A second provider while signed in links to the same session |
+| GET, POST | `/auth/:provider/callback` | Provider return (Apple uses `form_post`, so POST). Redirects to `/register` |
+| GET | `/api/auth/providers`, `/api/session` | Configured providers; current session `{provider, linked[], name, handle, avatar}` |
 | POST | `/api/attendee` | `{descriptors, consent, blurb}` -> `{id}` (profile comes from session) |
 | PATCH | `/api/attendee/me` | `{consent}` kill switch |
 | GET | `/api/gallery` | `[{id, name, handle, descriptors}]` for consenting attendees only. Avatars are a separate lazy endpoint |
