@@ -15,19 +15,26 @@ connectWs(me ? { attendee: me.id } : {}, (msg) => { if (msg.type === 'gallery_ch
 
 loadEngine({ video: true, onProgress: status }).then((h) => { engine = h; status(`Ready (${ENGINE}). ${index.owners.length ? new Set(index.owners.map(o => o.id)).size : 0} findable people. Tap Start.`); }).catch((e) => status('Model failed: ' + e.message));
 
-function showCard(att, sim) {
-  shown = att; shownSim = sim; lastShownAt = Date.now();
+let shownId = null, hauntSent = false;
+function renderCard(att, sim) {
   $('c-name').textContent = att.name; $('c-handle').textContent = att.handle ? '@' + att.handle : ''; $('c-blurb').textContent = att.blurb || '';
   $('c-sim').textContent = `match ${(sim * 100).toFixed(0)}%`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
-  $('haunt').disabled = !me || me.id === att.id; $('haunt').textContent = !me ? 'Register to haunt' : me.id === att.id ? "That's you" : '👻 Haunt them';
-  $('sheet').classList.add('show');
-  // fetch full card (avatar/blurb) lazily; gallery only has name + descriptors
-  api(`/api/attendee/${att.id}`).then((card) => { if (shown?.id === card.id) showCard(Object.assign(att, card), sim); }).catch(() => {});
 }
-$('dismiss').onclick = () => { $('sheet').classList.remove('show'); shown = null; votes.clear(); };
+function showCard(att, sim) {
+  const changed = shownId !== att.id;
+  shown = att; shownSim = sim; lastShownAt = Date.now(); shownId = att.id;
+  renderCard(att, sim);
+  if (changed) { // reset the haunt button only when a different person appears, never on a lazy card refresh
+    hauntSent = false;
+    $('haunt').disabled = !me || me.id === att.id; $('haunt').textContent = !me ? 'Register to haunt' : me.id === att.id ? "That's you" : '👻 Haunt them';
+    api(`/api/attendee/${att.id}`).then((card) => { if (shownId === card.id) renderCard(Object.assign(att, card), shownSim); }).catch(() => {});
+  }
+  $('sheet').classList.add('show');
+}
+$('dismiss').onclick = () => { $('sheet').classList.remove('show'); shown = null; shownId = null; votes.clear(); };
 $('haunt').onclick = async () => {
-  if (!shown || !me) return; $('haunt').disabled = true;
+  if (!shown || !me || hauntSent) return; $('haunt').disabled = true; hauntSent = true;
   try { await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: shown.id, similarity: shownSim } }); $('haunt').textContent = `You haunted ${shown.name} 👻`; }
   catch (e) { $('haunt').textContent = e.status === 429 ? 'Already haunted recently' : 'Failed: ' + e.message; }
 };
@@ -46,7 +53,7 @@ export async function processFrame(source) {
   if (bestId && bestVotes >= VOTES_NEEDED && (!shown || shown.id !== bestId)) {
     const r = results.find((x) => x.attendee?.id === bestId); showCard(r.attendee, r.similarity);
   }
-  if (shown && Date.now() - lastShownAt > 8000 && !votes.has(shown.id)) { $('sheet').classList.remove('show'); shown = null; }
+  if (shown && Date.now() - lastShownAt > 8000 && !votes.has(shown.id)) { $('sheet').classList.remove('show'); shown = null; shownId = null; }
   draw(source, results);
   return results;
 }
