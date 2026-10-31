@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 14:11 PT.** LIVE: https://aura-haunt.fly.dev (Fly app `aura-haunt`, sjc) runs 62083f2, which is current `main`; `/api/version` and `/api/gallery` answer, FaceX wasm and both weight files are served, `data/` sits on the `haunt_data` volume. `FLY_API_TOKEN` is a repo secret now, so every push to `main` deploys; CI green on every commit this hour. On `main`: FaceX hybrid engine default, Express + ws server with gallery, haunt push, cooldown, kill switch and `/api/version`, API smoke test (no browser e2e yet), GitHub/LinkedIn/Google/Apple sign-in behind env vars (docs/OAUTH_SETUP.md), branch-first hooks, `/start` interview that posts `[PLAN]` lines, integrator pipeline watch. Drift: ARCHITECTURE.md does not list `GET /api/version` (7d807ca); Matt adds it. No Shelled run yet; EDGE_CASES.md is still the template (#6/#7, tarecq). `chris/oauth-setup-docs` is fully on main and can be deleted. matt/next (one log line) is the only branch ahead of main. Nobody blocked. A laptop that looked up aura-haunt.fly.dev before 14:05 may hold a cached NXDOMAIN; `dig @1.1.1.1 aura-haunt.fly.dev` shows 66.241.125.24.
+**2026-10-31 14:20 PT.** LIVE: https://aura-haunt.fly.dev runs ef65075, which is current `main`; `/api/version` and `/api/gallery` answer, FaceX wasm and weights are served, every push to `main` deploys, CI green. On `main`: FaceX hybrid engine, Express + ws server (gallery, haunt push, cooldown, kill switch, `/api/version`), API smoke test (no browser e2e yet), four sign-in providers behind env vars, branch-first hooks, `/start` interview with `[PLAN]` lines, session launcher. Second track decided 14:14: Fetch.ai as the Scout (IDEAS.md 2b, tarecq, #10 claimed; slice 1 is `server/scout.js` pairwise scoring + clue over `state`). Rows #17-20 (Most Wanted, Haunt back, connections on `/me`, post-event digest) are unclaimed. Drift: ARCHITECTURE.md still lacks `GET /api/version` (Matt). No Shelled run yet; EDGE_CASES.md is the template (#6/#7, tarecq). Branches ahead of main: matt/next and tarecq/next, each one INTEGRATION_LOG line; both append the same file, keep both on rebase. `chris/oauth-setup-docs` is on main and can be deleted. Nobody blocked.
 
 ## Now (this hour)
 
@@ -41,13 +41,14 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | # | Task | Owner |
 |---|------|-------|
 | 0 | Repo, README, ARCHITECTURE, RESEARCH (5 sections), EDGE_CASES template, CLAUDE.md, integrator skill, sync.sh | main session + fork |
+| - | GitHub profile enrichment on cards (bio, location, pushes this week, repos, LinkedIn link), 4be2a21 | main session |
 
 ## Decisions
 
-- Tracks: **Shelled AI** + one of Fetch.ai / TrueForge (max 2 per project). Base44 skipped.
+- Tracks: **Shelled AI** + **Fetch.ai** (the Scout, below; decided 14:14, max 2 per project). TrueForge dropped, Base44 skipped.
 - Git: one branch per session (`<name>/<task>`), atomic commits, `scripts/sync.sh` after every commit, land with `/merge`. Nobody commits to `main` by hand. (Replaced direct-to-main at 13:40: parallel sessions were colliding on the same files.)
 - Face matching is on-device only. No face image or embedding reaches a hosted model.
 - Second track is **Fetch.ai**, built as the Scout (IDEAS.md 2b): the agent pairs people and gives clues, the camera finds them, the haunt is the ground truth. Clues come from profiles and public GitHub only, never from faces. (14:20, tarecq)
+- The Scout adds `POST /api/rating`, a `match` event and a clue payload on `state`; ARCHITECTURE.md changes in the same commit as the code (tarecq's [PLAN], 14:14).
 - Never close a PR or issue, or delete a branch, without a comment saying why and where the work went (13:51, CLAUDE.md). `/merge` and the integrator comment on the open PR before deleting its branch.
 
-| GitHub profile enrichment on cards (bio, location, pushes this week, repos, LinkedIn link) | main-session | 4be2a21 |
