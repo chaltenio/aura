@@ -5,12 +5,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deployInfo } from '../server/version.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
@@ -32,7 +33,14 @@ try {
     const dup = ids.filter((x, i) => ids.indexOf(x) !== i); check(!dup.length, `${p} repeats ids: ${dup.join(', ')}`);
   }
 
-  const ver = (await json('/api/version')).data; check(ver.version && ver.attendees === 0, '/api/version reports version and counts');
+  const ver = (await json('/api/version')).data; check(ver.version === 'smoke1' && ver.deploy === 1 && ver.deployedAt > 0 && ver.attendees === 0, '/api/version reports version, deploy number and counts');
+  { // deploy counter (server/version.js): +1 per new Fly image, same number on a restart or secrets change, none on a dev build
+    const dir = mkdtempSync(join(tmpdir(), 'haunt-ver-'));
+    const img = (n, sha = 'abc1234') => ({ APP_VERSION: sha, FLY_IMAGE_REF: `registry.fly.io/aura-haunt:deployment-${n}` });
+    const got = [img(1), img(1), img(2), img(3, 'def5678'), {}, img(3, 'def5678')].map((env, i) => deployInfo(dir, env, 1000 + i));
+    const want = [[1, 1000], [1, 1000], [2, 1002], [3, 1003], [null, null], [3, 1003]];
+    check(JSON.stringify(got.map((v) => [v.deploy, v.deployedAt])) === JSON.stringify(want), `deploy counter: ${JSON.stringify(got)}`);
+  }
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: false, descriptors: [vec()] } })).status === 400, 'consent=false should be rejected');
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: true, descriptors: [[1, 2, 3]] } })).status === 400, 'short descriptor should be rejected');
 

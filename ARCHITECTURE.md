@@ -110,6 +110,7 @@ then do leave the phone, so the consent screen must say so if this path is taken
 - `express` (or Hono) for JSON + static files.
 - `ws` for one socket per phone, keyed by attendee id.
 - One JSON file (`data/db.json`), written on every change. Fifty attendees is nothing; SQLite if it ever matters.
+  `data/version.json` holds the deploy counter (`server/version.js`, see `/api/version`).
 - OAuth: GitHub first (instant to set up), LinkedIn OIDC second (needs the
   "Sign In with LinkedIn using OpenID Connect" product on the dev app; usually
   self-serve). Both return name + avatar URL. Download the avatar at registration
@@ -171,7 +172,7 @@ on a `gallery_changed` socket message).
 | POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
 | GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
-| GET | `/api/version` | `{version, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`), boot time, counts. Used by deploy and integrator checks |
+| GET | `/api/version` | `{version, deploy, deployedAt, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`); `deploy` = the deploy number, one more on every deploy (a new Fly image, `FLY_IMAGE_REF`; off Fly a new `APP_VERSION`), kept with `deployedAt` (ms, when that deploy first booted) in `data/version.json`, both `null` on a dev build; boot time; counts. The home page footer shows `v<deploy> · <version> · deployed <time>`. Used by deploy and integrator checks |
 | GET | `/admin` | Admin page; asks for the token, calls the routes below |
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
 | WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |

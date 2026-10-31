@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { mountAuth, sessionProfile } from './auth.js';
 import { ensureProfile } from './profile.js';
 import { mountAdmin } from './admin.js';
+import { deployInfo } from './version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -40,6 +41,8 @@ async function ensureWeights() {
 
 // ---------- storage ----------
 mkdirSync(DATA_DIR, { recursive: true });
+const VERSION = deployInfo(DATA_DIR); // { version: git sha, deploy: v-number (+1 per deploy), deployedAt }
+console.log(VERSION.deploy ? `deploy v${VERSION.deploy} (${VERSION.version})` : 'dev build (no deploy number)');
 const db = existsSync(DB_PATH)
   ? JSON.parse(readFileSync(DB_PATH, 'utf8'))
   : { attendees: [], events: [] };
@@ -95,9 +98,10 @@ app.post('/api/attendee', (req, res) => {
   res.json({ id: a.id, token: a.token });
 });
 
-// gallery: only consenting attendees, only what matching needs
-app.get('/api/version', (_req, res) => res.json({ version: process.env.APP_VERSION || 'dev', startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length }));
+// version: git sha, deploy number (one more per deploy, server/version.js) and when it went live, boot time, counts
+app.get('/api/version', (_req, res) => res.json({ ...VERSION, startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length }));
 
+// gallery: only consenting attendees, only what matching needs
 app.get('/api/gallery', (_req, res) => {
   res.json(db.attendees.filter((a) => a.consent && !a.blocked).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
 });
