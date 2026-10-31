@@ -56,7 +56,7 @@ const byId = (id) => db.attendees.find((a) => a.id === id);
 const cleanCostume = (c) => (typeof c === 'string' && /^[a-z]{1,20}$/.test(c) && c !== 'plain' ? c : null);
 const publicCard = (a) => ({
   id: a.id, name: a.name, handle: a.handle || '', blurb: a.blurb || '', linkedin: a.linkedin || '', profile: a.profile && !a.profile.error ? a.profile : null,
-  ...(profileLoading(a) && { profileLoading: true }), // a GitHub lookup is running; the card is pushed again when it lands
+  profileLoading: profileLoading(a), // a GitHub lookup is running; the card is pushed again when it lands. Always a boolean: phones merge pushes
   avatar: a.avatar || null, consent: !!a.consent, costume: a.costume || null,
   hauntedCount: db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).length,
   huntCount: db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).length,

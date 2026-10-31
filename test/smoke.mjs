@@ -144,7 +144,7 @@ try {
     check(!inbox.some((m) => m.type === 'gallery_changed'), 'instant: a profile edit no longer makes every /hunt refetch the gallery');
     ({ r } = await edit({ blurb: 'ghosts', linkedin: 'https://www.linkedin.com/in/pia', costume: 'plain' }));
     const c2 = await next(changed);
-    check(c2?.attendee.blurb === 'ghosts' && c2.attendee.linkedin === 'https://www.linkedin.com/in/pia' && c2.attendee.costume === null && !c2.attendee.profileLoading, 'instant: blurb, LinkedIn and costume off arrive in one push');
+    check(c2?.attendee.blurb === 'ghosts' && c2.attendee.linkedin === 'https://www.linkedin.com/in/pia' && c2.attendee.costume === null && c2.attendee.profileLoading === false, 'instant: blurb, LinkedIn and costume off arrive in one push (profileLoading always a boolean)');
     ({ r } = await edit({ consent: false }));
     const gone = await next((m) => m.type === 'attendee_gone' && m.id === pia.id);
     check(gone && Object.keys(gone).sort().join() === 'id,type' && !inbox.some(changed), 'instant: opting out pushes attendee_gone with the id only, never the card');

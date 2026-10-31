@@ -37,13 +37,13 @@ if (!me) { $('nocard').hidden = false; } else {
   let queue = Promise.resolve();
   const patch = (body) => (queue = queue.catch(() => {}).then(() => api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, ...body } })));
   const costume = costumePicker($('costume'), { name: () => $('name').textContent || me.name, onPick: (c) => patch({ costume: c }).catch(() => toast("Costume not saved. Check your connection and pick it again.")) });
-  // pick: also move the costume chips. Not for a save or a push: the chips on this phone are already ahead of the server.
-  const showCard = (card, pick = true) => {
+  // controls: also set the costume chips and the findable box. Not for a save or a push: this phone's own taps are already
+  // ahead of the server, and a push from an earlier tap must not undo a later one.
+  const showCard = (card, controls = true) => {
     $('name').textContent = card.name; $('handle').textContent = card.handle ? '@' + card.handle : ''; $('blurb').textContent = card.blurb || '';
     $('stats').textContent = `haunted ${card.hauntedCount}× · hunted ${card.huntCount}×`;
     if (card.avatar) { $('avatar').src = card.avatar; $('avatar').hidden = false; $('noavatar').hidden = true; }
-    $('consent').checked = card.consent;
-    if (pick) costume.set(card.costume);
+    if (controls) { $('consent').checked = card.consent; costume.set(card.costume); }
     lookingUp = !!card.profileLoading; // the server pushes the card again when the GitHub lookup lands
     const looking = lookingUp ? `<div class="mute">Looking up @${esc(card.handle)} on GitHub…</div>` : '';
     $('profile').innerHTML = looking + (renderProfile(card) || (looking ? '' : '<span class="mute">Add your GitHub handle below to show your profile on your card.</span>'));
