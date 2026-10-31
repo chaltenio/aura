@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 13:47 PT.** On `main` (6da13ca), `npm test` green: FaceX hybrid engine default in `web/face.js`, Express + ws server with gallery, haunt push, cooldown and kill switch, API smoke test in `test/smoke.mjs` (no browser e2e yet), GitHub/LinkedIn/Google/Apple sign-in behind env vars, Dockerfile + fly.toml + `scripts/deploy.sh`, CI on every push, branch-first hooks, `/start`, bus `ready`/`merged`, IDEAS.md backlog. Not deployed: `FLY_API_TOKEN` is not a repo secret, so the deploy job skips on every push to main and aura-haunt.fly.dev does not resolve (#4, main session). No Shelled run yet; EDGE_CASES.md is still the template (#6/#7, tarecq). No branch is ahead of main, no open PR, nobody blocked. Integrator loop runs every 5 min from `../aura-integrator`.
+**2026-10-31 13:56 PT.** On `main` (b13df01), `npm test` and CI green: FaceX hybrid engine default in `web/face.js`, Express + ws server with gallery, haunt push, cooldown and kill switch, API smoke test in `test/smoke.mjs` (no browser e2e yet), GitHub/LinkedIn/Google/Apple sign-in behind env vars with setup steps in docs/OAUTH_SETUP.md, Dockerfile + fly.toml + `scripts/deploy.sh`, CI on every push, branch-first hooks, `/start`, bus `ready`/`merged`, IDEAS.md backlog. Not deployed: `FLY_API_TOKEN` is not a repo secret, so the deploy job skips on every push to main and aura-haunt.fly.dev does not resolve (#4, main session). No Shelled run yet; EDGE_CASES.md is still the template (#6/#7, tarecq). Chris's PR #3 (OAuth docs) landed through the GitHub merge button, not /merge; branch `chris/oauth-setup-docs` is fully on main and can be deleted. matt/next (one INTEGRATION_LOG line) is the only branch ahead of main. Nobody blocked. Integrator loop runs every 5 min from `../aura-integrator`.
 
 ## Now (this hour)
 
@@ -43,5 +43,6 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 - Tracks: **Shelled AI** + one of Fetch.ai / TrueForge (max 2 per project). Base44 skipped.
 - Git: one branch per session (`<name>/<task>`), atomic commits, `scripts/sync.sh` after every commit, land with `/merge`. Nobody commits to `main` by hand. (Replaced direct-to-main at 13:40: parallel sessions were colliding on the same files.)
 - Face matching is on-device only. No face image or embedding reaches a hosted model.
+- Never close a PR or issue, or delete a branch, without a comment saying why and where the work went (13:51, CLAUDE.md). `/merge` and the integrator comment on the open PR before deleting its branch.
 
 | GitHub profile enrichment on cards (bio, location, pushes this week, repos, LinkedIn link) | main-session | 4be2a21 |
