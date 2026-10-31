@@ -25,6 +25,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 29 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [x] |
 | 30 | Instant profile updates: a `/me` edit (costume, GitHub handle, LinkedIn, findable) shows on every open phone at once. The server pushes the changed card (`attendee_changed`, or `attendee_gone {id}` on opt-out) instead of making every `/hunt` refetch the whole gallery; `/hunt` redraws the costume on the next frame and re-renders an open card; `/me` shows the save at once and the GitHub profile arrives by push | Matt | [x] |
 | 32 | Base44 mirror: the same `web/` frontend also deployed to Base44 hosting (Base44 "Real users" challenge), calling the Fly API + WebSocket cross-origin (CORS allowlist, sign-in handoff without cookies); every push to `main` deploys Fly, then Base44 (`.github/workflows/deploy.yml`) | Matt | [x] |
+| 34 | Vision Pro snap mode: Safari on Apple Vision Pro only lends pages the Persona camera (never the room cameras), so `/hunt` there swaps the dead feed for snap mode: look at someone, screenshot (top button + Digital Crown), Pick photo; faces matched on the headset, card + Haunt as usual | Matt | [ ] |
 
 ## Next
 
