@@ -66,3 +66,17 @@ Merge or rewrite other people's commits, reassign tasks, or "fix" product code. 
 | :30 | `scripts/sync.sh`, read STATUS | Update STATUS, log, speak |
 | :30 to :55 | Build | Same |
 | :55 | Sync again, real-phone check of main | Confirm main is demoable; name the one red thing |
+
+## 7. Sessions on different laptops: the team bus
+
+Claude Code's own messaging does not cross machines or accounts: `SendMessage`/`ListAgents` reach sessions on your machine, agent teams are "one team per session, scoped to that session", and Remote Control mirrors your own session to your own phone or browser ([agent teams docs](https://code.claude.com/docs/en/agent-teams), [Remote Control docs](https://code.claude.com/docs/en/remote-control)). The Claude GitHub App (`/install-github-app`) only reacts on PRs and issues and needs a repo admin; Claude in Slack needs a workspace and accounts people may not have.
+
+So the bus is the thing everyone already has: **a pinned GitHub issue, read and written with `gh`.**
+
+- `scripts/bus.sh` wraps it: `read`, `since`, `post`, `claim`, `ask`, `answer`, `decide`, `digest`. One comment per message, first line `[KIND] @who HH:MM sha`.
+- `.claude/settings.json` (committed) has a SessionStart hook that prints the last 12 bus messages and the STATUS paragraph into every teammate's Claude context on startup, resume, clear, and compact. Nobody has to remember to read it.
+- The `/integrator` loop reads `scripts/bus.sh since` every pass, answers ASKs it can answer from the docs, flags double claims, copies DECIDEs into TODO.md, and posts its digest back to the bus.
+- Humans post from their phone by commenting on the issue. Subagents inherit the repo and `gh` auth, so they can post too; tell them to in the brief.
+- Join in under five minutes, no new accounts: be a collaborator on the repo, have `gh auth login` done, clone, `npm install`, open `claude`. The hook does the rest.
+
+Ruled out for today: a repo-hosted MCP server (`claude mcp add` per person plus an auth story, and it would just wrap the same `gh` calls), GitHub Discussions (disabled on the repo), Slack or Discord webhooks (accounts, and one more place to look). If the hackathon runs past today, the MCP server is the upgrade: same `bus.sh` verbs as tools, so agents call `claim_task` instead of shelling out.

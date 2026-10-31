@@ -19,7 +19,11 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
    gh pr list --state open --json number,title,author,headRefName,updatedAt,mergeable --jq '.[] | "\(.number) \(.title) @\(.author.login) \(.headRefName) mergeable=\(.mergeable)"'
    gh run list --limit 5 --json name,status,conclusion,headBranch --jq '.[] | "\(.name) \(.headBranch) \(.status) \(.conclusion)"' 2>/dev/null
    ```
-   If there is nothing new and no open PR changed, append `no change` to the log line and stop the pass early.
+   Then read the team bus (the pinned GitHub issue every teammate's session writes to):
+   ```bash
+   scripts/bus.sh since
+   ```
+   If there is nothing new on main, no open PR changed, and nothing new on the bus, append `no change` to the log line and stop the pass early.
 
 2. **Bring the integrator worktree up to date** (never touch the human's working tree):
    ```bash
@@ -38,11 +42,14 @@ You are the one pair of eyes on `main` while 3 to 5 people and their agents push
 
 5. **Update TODO.md.** Rewrite only the `## STATUS` paragraph (date, what is on main and working, what is broken, who is blocked). Tick tasks that landed. Do not reassign tasks; ask the owner instead.
 
-6. **Log and speak.**
+6. **Answer the bus.** For every new `[ASK]` since the last pass, reply with `scripts/bus.sh answer "<quote the ask> -> <answer>"` if the answer is in ARCHITECTURE.md, TODO.md, or the code; otherwise name who should answer. For every `[CLAIM]`, check TODO.md has the owner; if two people claimed the same file, say so on the bus. Treat `[DECIDE]` lines as standing orders and copy them into TODO.md Decisions.
+
+7. **Log and speak.**
    - Append one line to `docs/INTEGRATION_LOG.md` in the documented format.
    - `git add TODO.md docs/INTEGRATION_LOG.md && git commit -qm "integrator: <HH:MM> digest" && git push -q origin main` (pull --rebase first if rejected).
    - `git rev-parse origin/main > .integrator-last` (this file is gitignored).
-   - Say in chat, in three lines max: what landed, what is broken or colliding, and the one thing each affected person should do next. Name people. No praise, no filler.
+   - Post the same three lines to the bus: `scripts/bus.sh digest "<landed> | <red or colliding> | <who does what next>"`.
+   - Say them in chat too. Name people. No praise, no filler.
 
 ## Escalate, do not fix
 

@@ -27,6 +27,16 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - Integration checkpoint every 30 min: everyone pushes, integrator runs the smoke test, STATUS in TODO.md updated.
 - Integrator tab: `/loop 5m /integrator` (see `.claude/skills/integrator/SKILL.md`).
 
+## Talking to the team bus
+The bus is one pinned GitHub issue (label `bus`) that every teammate's Claude Code reads and writes with `scripts/bus.sh`. It is how sessions on different laptops stay aligned; SendMessage only reaches sessions on your own machine.
+- Every session start shows the last 12 bus messages and the STATUS paragraph (SessionStart hook in `.claude/settings.json`). Read them before doing anything.
+- Before starting a task: `scripts/bus.sh claim "#7 hunt.js: 3-frame vote"` and put your name in TODO.md.
+- After each atomic commit that others should know about: `scripts/bus.sh post "hunt: card needs 3 frames (web/hunt.js)"`.
+- Stuck or unsure what someone else is doing: `scripts/bus.sh ask "..."`. Answer others' ASKs with `scripts/bus.sh answer "..."`.
+- Anything everyone must follow: `scripts/bus.sh decide "..."` and add it to TODO.md Decisions.
+- Catch up any time: `scripts/bus.sh read 30`. The integrator reads the bus every pass and posts `[INTEGRATOR]` digests.
+- Humans can post from a phone by commenting on the issue (`scripts/bus.sh url`). Keep messages to one or two lines; name files.
+
 ## Product rules
 - No face image or embedding ever goes to a hosted LLM (Anthropic policy forbids facial recognition). Matching is on-device only; hosted models get events, profiles, room photos.
 - Consent is a server-side filter, not a UI nicety. Unregistered faces are never named, never stored.
