@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAUNT · Bulk enroll</title><link rel="stylesheet" href="/app.css">
+<style>table{width:100%;border-collapse:collapse;font-size:13px} td,th{border-bottom:1px solid #2a2738;padding:6px 4px;text-align:left;vertical-align:middle} td img{width:40px;height:40px;border-radius:50%;object-fit:cover} .ok{color:var(--ok)} .bad{color:var(--bad)}</style></head>
+<body>
+<h1><span class="ghost">👻</span> Bulk enroll</h1>
+<p class="mute">For the organizer. Load a CSV of pre-registered attendees and their photos; face signatures are computed here in the browser and only the signatures go to the server.</p>
+<div class="panel">
+  <label for="csv">1. CSV (header row: <code>name,handle,linkedin,blurb,photo</code>; <code>photo</code> = file name you'll add in step 2, or an image URL that allows cross-origin loading)</label>
+  <input id="csv" type="file" accept=".csv,text/csv"> <span class="hint">or paste:</span>
+  <textarea id="csvtext" placeholder="name,handle,linkedin,blurb,photo
+Ada Lovelace,adalovelace,https://linkedin.com/in/ada,Building a difference engine,ada.jpg"></textarea>
+  <label for="photos">2. Photos (file names must match the <code>photo</code> column)</label>
+  <input id="photos" type="file" accept="image/*" multiple>
+  <div class="check"><input id="consent" type="checkbox"><label for="consent" style="margin:0">These people agreed at signup that other attendees' phones may recognize their face during this event.</label></div>
+  <button id="run" disabled>3. Enroll everyone</button>
+  <div class="status" id="status">Loading face model…</div>
+</div>
+<div class="panel" style="overflow:auto"><table id="rows"><thead><tr><th></th><th>Name</th><th>Handle</th><th>Photo</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+<p class="hint"><a href="/">Home</a> · <a href="/screen">Screen</a></p>
+<script type="module" src="/enroll.js"></script>
+</body></html>
