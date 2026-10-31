@@ -62,7 +62,7 @@ if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR))
 
 mountAuth(app);
 
-// register. A signed-in session (GitHub/LinkedIn) supplies provider, id, avatar and defaults; otherwise 'manual' or 'csv'.
+// register. A signed-in session (GitHub/LinkedIn/Google/Apple) supplies provider, id, avatar and defaults; otherwise 'manual' or 'csv'.
 app.post('/api/attendee', (req, res) => {
   const body = req.body || {};
   const sess = sessionProfile(req);
@@ -78,7 +78,7 @@ app.post('/api/attendee', (req, res) => {
   }
   const a = {
     id: randomUUID(), token: randomBytes(16).toString('hex'),
-    provider: ['manual', 'csv', 'linkedin', 'github'].includes(provider) ? provider : 'manual', providerId: providerId ? String(providerId).slice(0, 80) : null,
+    provider: ['manual', 'csv', 'linkedin', 'github', 'google', 'apple'].includes(provider) ? provider : 'manual', providerId: providerId ? String(providerId).slice(0, 80) : null,
     name: name.trim().slice(0, 60), handle: String(handle || '').trim().slice(0, 60),
     linkedin: /^https?:\/\/(www\.)?linkedin\.com\//.test(String(linkedin || '')) ? String(linkedin).slice(0, 200) : '',
     blurb: String(blurb || '').trim().slice(0, 200), consent: true,
