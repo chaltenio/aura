@@ -208,7 +208,7 @@ await scene('hunt', async () => {
   await screen.evaluate((live) => { const q = qrcode(0, 'M'); q.addData(live + '/register'); q.make(); document.getElementById('qr').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2 }); }, LIVE);
   const theo = await phone('theo-me', { identity: ids.theo });
   await theo.goto(BASE + '/me'); await theo.waitForSelector('#name:not(:empty)');
-  await theo.locator('h1').tap(); // his first tap anywhere arms the shriek
+  await theo.locator('#name').tap(); // his first tap anywhere arms the shriek
   const hunter = await phone('priya-hunt', { feed: 'theo-room.y4m', identity: ids.priya, firstVisit: true });
   await hunter.goto(BASE + '/hunt'); await statusIs(hunter, /Ready/);
   const stops = [await record(screen, 'hunt-screen', { w: 1920, h: 1080 }), await record(theo, 'hunt-theo'), await record(hunter, 'hunt-priya')];
