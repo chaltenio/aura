@@ -47,7 +47,7 @@ Design goals for a 4-hour build:
 | Route | Job |
 |---|---|
 | `/register` | OAuth login (its profile photo is the face signature, embedded on-device), consent toggle, selfie capture (optional when the photo has a face), optional costume, upload |
-| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face (`web/costume.js`, from the face mesh, on-device) |
+| `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face: the WebGL lens (`web/lens.js`, see 1.2) when it loads, else flat 2D costumes (`web/costume.js`, from the recognition mesh) |
 | `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
 Two origins, one room. Fly serves the pages and the API together (https://aura-haunt.fly.dev). The Base44 mirror
@@ -73,6 +73,21 @@ transform (`alignToArcFace`), and feed it to FaceX's EdgeFace-XS wasm embedder
 (Apache-2.0, 7 MB, vendored in `web/vendor/facex/`), which returns a 512-float
 vector. Matching is cosine similarity. FaceX's own detector is not used: its weight
 file is unpublished, and its bundled align.js produced shifted crops.
+
+**Costume lens (effects only, `web/lens.js`).** Once recognition has confirmed a
+face (the card's 3-frame vote) and that person picked a costume, MediaPipe Face
+Landmarker (`@mediapipe/tasks-vision` 1.2.0, Apache-2.0, GPU delegate, CPU fallback)
+tracks it at camera rate inside a square crop around it (its own detector only
+finds selfie-distance faces). three.js (0.184) then draws the costume over the camera:
+face paint in UV space (`web/vendor/facegeom.js`, MediaPipe's canonical face model)
+wrapped onto the 478 landmarks and shaded by the real skin, irises recoloured inside
+the eyelids (stencil), a mouth that goes black or glows, fangs inside the open mouth,
+and 3D props posed by MediaPipe's head-pose matrix (63 degree camera, rendered
+through a viewport matching the crop) and hidden behind a head occluder. The lens
+never names anyone: it only draws on ids recognition handed it, and a tracked face
+that drifts from recognition's box is reset. Nothing leaves the phone; the libraries
+and the 3.7 MB model come from jsDelivr and Google's model bucket on the first match.
+`?lens=2d` forces the flat costumes.
 
 **Fallback: `human`** (`?engine=human`): Human's FaceRes 1024-float descriptor with
 Human's distance-based similarity. Weaker separation, kept for comparison.
@@ -154,10 +169,10 @@ CREATE TABLE attendees (
 
 CREATE TABLE events (
   id         INTEGER PRIMARY KEY,
-  type       TEXT NOT NULL,            -- 'haunt' | 'connect' | 'zone' (later)
+  type       TEXT NOT NULL,            -- 'haunt' | 'match' (the Scout, server/scout.js) | 'connect' | 'zone' (later)
   actor_id   TEXT NOT NULL,
   target_id  TEXT,
-  meta       TEXT,                     -- JSON
+  meta       TEXT,                     -- JSON. haunt: {ratings: {raterId: {verdict, at, source}}}. match: {round, scoutVersion, fit, pOrganic, features[], weights, clueA, clueB, deadline, status: open|found|expired, hauntId?, foundAt?}
   created_at INTEGER NOT NULL
 );
 ```
@@ -180,13 +195,15 @@ whenever their socket reconnects).
 | PATCH | `/api/attendee/:id` | `{token, consent?, blurb?, handle?, linkedin?, costume?}` -> public card. `consent: false` is the kill switch; `costume: null` or `'plain'` clears the costume; a changed `handle` starts a GitHub lookup (the same handle keeps its profile). Every edit reaches every socket at once (#30): `attendee_changed` with the card, or `attendee_gone {id}` when the person is not findable (opted out or blocked; never their card). Turning consent back on broadcasts `gallery_changed` instead, because phones need the face descriptors again |
 | GET | `/api/gallery` | `[{id, name, costume, descriptors}]` for consenting attendees only (the matching set `/hunt` loads; `costume` so it can draw it the moment a face matches). Cards and avatars come from `/api/attendee/:id` |
 | GET | `/api/attendee/:id` | Public card: `id, name, handle, blurb, linkedin, profile` (GitHub enrichment or null), `avatar, consent, costume, hauntedCount, huntCount`, plus `profileLoading` (true only while a GitHub lookup runs for a handle with nothing cached; the card is pushed again when it lands). A cached profile comes back at once even when over an hour old; it is refreshed in the background and pushed. 404 if unknown |
-| POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
+| POST | `/api/haunt` | `{actorId, token, targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Response and the `haunted` push both carry `hauntId` so the rating can name the haunt. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
+| POST | `/api/rating` | `{raterId, token, hauntId, verdict: 'yes' \| 'no' \| 'knew', source?: 'phone' \| 'asi1'}` -> `{ok, scout, reason, changed}`. The Scout's one question after any haunt, from either side: "Would you build something with them?" Stored on that haunt event as `meta.ratings[raterId]` (a second answer overwrites). `knew` is kept but never counted. 403 bad token, 404 a haunt you were not part of, 400 any other verdict. `scout` says whether the Scout arranged that haunt, `reason` why ("Paired on: complement, intent match") or that it was not the Scout's call, `changed` is a changelog entry when this rating tripped a weight change (server/scout.js) |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
-| GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen` |
+| GET | `/api/events` | `?limit=` (default 50, max 500) -> `{events, attendees, scout}`: newest first, each event with `actor` and `target` cards, plus every consenting attendee's card. Bootstraps `/screen`; `scout` is the Scout state block (same shape as the `scout` socket message) |
 | GET | `/api/version` | `{version, deploy, deployedAt, startedAt, attendees, events}`: deployed git sha (`APP_VERSION`); `deploy` = the deploy number, one more on every deploy (a new Fly image, `FLY_IMAGE_REF`; off Fly a new `APP_VERSION`), kept with `deployedAt` (ms, when that deploy first booted) in `data/version.json`, both `null` on a dev build; boot time; counts. The home page footer shows `v<deploy> · <version> · deployed <time>`. Used by deploy and integrator checks |
 | GET | `/admin` | Admin page; asks for the token, calls the routes below |
 | any | `/api/admin/*` | Needs `ADMIN_TOKEN` (header `x-admin-token`); 503 if unset, 401 if wrong. `GET overview`, `GET users` (no tokens/descriptors), `PATCH users/:id {blocked}`, `DELETE users/:id`, `POST messages {to \| group, text}`, `GET messages`, `GET/POST events {name}`, `POST events/:id/start\|end` (one active at a time; haunts carry `meetupId`). Blocked attendees leave the gallery and cannot haunt or be haunted |
 | WS | `/ws?attendee=<id>` (phones), `/ws?screen=1` (`/screen`) | server -> phone: `hello` (on every connect; a phone refetches the gallery on a reconnect's `hello`), `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed` (someone joined, came back or was unblocked: refetch the gallery), `attendee_changed {attendee}` (a profile edit or a GitHub lookup landing: the public card without `avatar`, applied in place), `attendee_gone {id}` (no longer findable: drop that face), `state` (roles/scores), `admin_message {text}`, `admin_status {blocked}`, `event_changed` |
+| WS | the Scout, same sockets | phone: `state {scout: {phase: 'clue', matchId, clue, deadline, round}}` when the Scout pairs you with someone (the clue describes the other person from profile and public GitHub, never a name, handle or photo), `state {scout: {phase: 'found', matchId, hauntId, reason}}` when a haunt between the pair lands. Screen: `scout {version, changedAt, weights, predicted {yes, no, n}, baseline {yes, no, n}, clues {sent, found, pending, expired}, changelog[], minN, ratedPairs, nextReviewAt}` on every clue, confirmation, rating and version change |
 
 Every `/api` route answers CORS for the `FRONTEND_ORIGINS` origins (preflight 204, methods GET POST PATCH DELETE,
 headers `content-type`, `x-haunt-session`, `x-admin-token`); `/ws` accepts any origin, as before.
