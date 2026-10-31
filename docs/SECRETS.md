@@ -29,6 +29,8 @@ scripts/secrets.sh push-to-host               # stage onto Fly (applied by the n
 
 Placeholders are `CHANGE_ME`; `push-to-host` skips them so a half-filled file never blanks a live key.
 
+Step-by-step provider app setup (GitHub, LinkedIn, Google, Apple) is in OAUTH_SETUP.md.
+
 Keys in the file: `PUBLIC_BASE_URL`, `ANTHROPIC_API_KEY`, `LINKEDIN_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`,
 `APPLE_CLIENT_ID` (Services ID), `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the .p8 with newlines written as `\n`),
 `ELEVENLABS_API_KEY`, `ASI_ONE_API_KEY`, `TRUEFOUNDRY_API_KEY`. Add new ones with `set`.
