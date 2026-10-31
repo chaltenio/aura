@@ -31,6 +31,17 @@ enter_repo() {
 
 current_branch() { git branch --show-current 2>/dev/null; }
 
+# cmd_dir (stdin = a shell command) -> the dir of its first `cd <dir>` or `git -C <dir>`, or nothing.
+# Agents in other worktrees run `cd <worktree> && git commit ...` while the session cwd stays in the main checkout.
+cmd_dir() {
+  python3 -c '
+import re, sys
+c = sys.stdin.read()
+arg = r"(?:\"([^\"]+)\"|\x27([^\x27]+)\x27|([^\s;&|)]+))"
+m = re.search(r"(?:^|[;&|(]\s*)cd\s+" + arg, c) or re.search(r"\bgit\s+-C\s+" + arg, c)
+print(next(g for g in m.groups() if g) if m else "")' 2>/dev/null
+}
+
 # file_age <path> -> seconds since mtime, or a huge number if missing
 file_age() {
   [ -e "$1" ] || { echo 999999; return; }
