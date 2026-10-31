@@ -106,7 +106,7 @@ then do leave the phone, so the consent screen must say so if this path is taken
 
 - `express` (or Hono) for JSON + static files.
 - `ws` for one socket per phone, keyed by attendee id.
-- `better-sqlite3`, single file. Fifty attendees is nothing.
+- One JSON file (`data/db.json`), written on every change. Fifty attendees is nothing; SQLite if it ever matters.
 - OAuth: GitHub first (instant to set up), LinkedIn OIDC second (needs the
   "Sign In with LinkedIn using OpenID Connect" product on the dev app; usually
   self-serve). Both return name + avatar URL. Download the avatar at registration
@@ -119,6 +119,9 @@ live event feed ("Matthew haunted Sam"), most-haunted, most-connected, headcount
 The room scan (Gaussian splat) plugs in here later; it is not part of the core.
 
 ## 2. Data model
+
+The MVP stores this as one JSON file (`data/db.json`, or `DATA_DIR`); the SQL below is
+the shape, and the migration target if we outgrow a file.
 
 ```sql
 CREATE TABLE attendees (

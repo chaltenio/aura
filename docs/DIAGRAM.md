@@ -36,7 +36,7 @@ flowchart LR
     subgraph engine["face.js: on-device face engine"]
       direction TB
       det["Human BlazeFace detector<br/>+ FaceMesh 468 landmarks<br/>tfjs wasm backend, 320 px input"]
-      fx["FaceX path (default, ?engine=facex)<br/>5 keypoints from mesh, align.js warp to 112x112<br/>EdgeFace-XS wasm embedder, 512-d"]
+      fx["FaceX path (default, ?engine=facex)<br/>5 keypoints from mesh, alignToArcFace warp to 112x112<br/>EdgeFace-XS wasm embedder, 512-d"]
       hres["Human path (fallback, ?engine=human)<br/>FaceRes description, 1024-d<br/>human.match.find"]
       match["matchOne(): cosine vs gallery index<br/>THRESHOLD facex 0.4 / human 0.5<br/>ABSTAIN = THRESHOLD - 0.1<br/>same-length descriptors only"]
       det --> fx --> match
@@ -72,7 +72,7 @@ flowchart LR
     cfd["cloudflared quick tunnel<br/>npm run tunnel, forwards to localhost:3000"]
     subgraph srv["server/index.js: Express + ws on port 3000"]
       direction TB
-      stat["static web/ (extensions: html)<br/>/vendor/facex: facex.js, facex.wasm, align.js<br/>edgeface_xs_fp32.bin (gitignored)"]
+      stat["static web/ (extensions: html)<br/>/vendor/facex: facex.js, facex.wasm, alignToArcFace<br/>edgeface_xs_fp32.bin (gitignored)"]
       api["JSON API (5 MB body limit)<br/>POST /api/attendee, GET /api/gallery<br/>GET /api/attendee/:id, GET /api/me/:id<br/>PATCH /api/attendee/:id, POST /api/haunt<br/>GET /api/events"]
       wsrv["WebSocket /ws (server to client only)<br/>?attendee=id into sockets map<br/>?screen=1 into screens set<br/>sendTo(), broadcast(), broadcastScreen()"]
       cool["in-memory haunt cooldown<br/>60 s per actor:target pair"]
