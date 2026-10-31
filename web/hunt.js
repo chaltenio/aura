@@ -1,6 +1,7 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
 import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, renderProfile } from '/common.js';
 import { costumeLayer, costumeTitle, COSTUMES } from '/costume.js';
+import { mountPresence, isOnline } from '/presence.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };                          // small numbers line under the camera
@@ -16,12 +17,12 @@ let shown = null, shownSim = 0, lastSeenShown = 0, sheetTouched = false, closeTi
 const me = getMe();
 const costumes = costumeLayer($('wrap'), { threshold: THRESHOLD }); // draws a recognised person's costume over the camera
 if (!me) { $('melink').textContent = 'Register'; $('melink').href = '/register'; }
+mountPresence($('presence')); // header chip: who is on HAUNT right now (#33)
 
 const others = () => new Set(index.owners.filter((o) => o.id !== me?.id).map((o) => o.id)).size;
 function renderCounts() {
   if (!engine) return;
   const n = others();
-  $('hud-count').textContent = `${n} findable`;
   $('idle-sub').textContent = n ? `${n} ${n === 1 ? 'person' : 'people'} here can be found.` : 'Nobody else is findable yet. Ask people to scan the QR and register.';
 }
 async function refreshGallery() { try { index = buildIndex(await api('/api/gallery')); } catch {} renderCounts(); }
@@ -61,7 +62,16 @@ function renderCard(att, sim) {
   $('c-sim').textContent = `${(sim * 100).toFixed(0)}% match`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
   $('c-profile').innerHTML = renderProfile(att);
+  renderLive(att);
 }
+// whether a haunt reaches them live (#33): online, their phone shrieks; offline, it only waits on their card
+function renderLive(att) {
+  const el = $('c-live'), on = isOnline(att.id);
+  el.hidden = !!me && me.id === att.id;
+  el.className = on ? 'live on' : 'live';
+  el.textContent = on ? 'Online now: their phone will shriek' : 'Offline: your haunt waits on their card, no shriek';
+}
+addEventListener('presencechange', () => { if (shown) renderLive(shown); });
 function showCard(att, sim) {
   const changed = shownId !== att.id;
   shown = att; shownSim = sim; lastSeenShown = Date.now(); shownId = att.id;
@@ -103,7 +113,7 @@ $('haunt').onclick = async () => {
   try {
     await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: target.id, similarity: shownSim } });
     if (shownId !== target.id) return;
-    b.className = 'ok'; b.textContent = `✓ ${firstName(target.name)} is haunted 👻`; boo(b);
+    b.className = 'ok'; b.textContent = isOnline(target.id) ? `✓ ${firstName(target.name)} is haunted 👻` : `✓ Saved on ${firstName(target.name)}'s card (offline)`; boo(b);
     closeTimer = setTimeout(() => { if (shownId === target.id) closeCard(true); }, 3500);
   } catch (e) {
     if (shownId !== target.id) return;

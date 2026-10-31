@@ -3,10 +3,10 @@
 <meta name="theme-color" content="#0b0a10"><link rel="icon" href="/favicon.svg">
 <title>HAUNT · Hunt</title><link rel="stylesheet" href="/app.css"></head>
 <body>
-<header class="top"><a class="brand" href="/">👻 HAUNT</a><a class="top-link" id="melink" href="/me">My card</a></header>
+<header class="top"><a class="brand" href="/">👻 HAUNT</a><button class="presence" id="presence" hidden></button><a class="top-link" id="melink" href="/me">My card</a></header>
 <div class="video-wrap" id="wrap">
   <video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas>
-  <div class="hud"><span class="pill" id="hud-state"></span><span class="pill" id="hud-count"></span></div>
+  <div class="hud"><span class="pill" id="hud-state"></span></div>
   <div class="cam-hint" id="hint"></div>
   <div class="cam-idle" id="idle">
     <div class="cam-ghost">👻</div>
@@ -19,7 +19,7 @@
 <details class="dev"><summary class="hint">Test with a photo</summary><input id="testfile" type="file" accept="image/*"></details>
 <div class="sheet" id="sheet" role="dialog" aria-labelledby="c-name">
   <button class="grab" id="grab" aria-label="Close"></button>
-  <div class="card"><img id="c-avatar" alt="" hidden><div class="noavatar" id="c-noavatar">👤</div><div><div class="name" id="c-name"></div><div class="handle" id="c-handle"></div><div class="blurb" id="c-blurb"></div><div class="match" id="c-sim"></div></div></div>
+  <div class="card"><img id="c-avatar" alt="" hidden><div class="noavatar" id="c-noavatar">👤</div><div><div class="name" id="c-name"></div><div class="handle" id="c-handle"></div><div class="blurb" id="c-blurb"></div><div class="match" id="c-sim"></div><div class="live" id="c-live" hidden></div></div></div>
   <div id="c-profile"></div>
   <button id="haunt">👻 Haunt them</button>
   <button class="secondary" id="dismiss">Close</button>

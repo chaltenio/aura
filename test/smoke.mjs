@@ -27,7 +27,7 @@ try {
   for (let i = 0; i < 100 && !up; i++) { try { up = (await fetch(BASE + '/api/gallery')).ok; } catch {} if (!up) await new Promise((r) => setTimeout(r, 200)); }
   check(up, 'server did not boot: ' + serverLog);
 
-  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/admin', '/face.js', '/common.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
+  for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate', '/admin', '/face.js', '/common.js', '/presence.js', '/app.css', '/vendor/facex/facex.js', '/vendor/facex/facex.wasm']) {
     const r = await fetch(BASE + p); check(r.ok, `GET ${p} -> ${r.status}`);
   }
   for (const p of ['/', '/register', '/hunt', '/me', '/screen', '/enroll', '/calibrate']) { // a repeated id makes $('x') grab the wrong element

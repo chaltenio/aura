@@ -1,7 +1,9 @@
 import { api, getMe, clearMe, connectWs, soundOn, hauntedAlert, toast, esc, fmtTime, renderProfile, normGithub, normLinkedin } from '/common.js';
 import { costumePicker } from '/costume.js';
+import { mountPresence } from '/presence.js';
 const $ = (id) => document.getElementById(id);
 const me = getMe();
+mountPresence($('presence'), { listen: !me }); // who is on HAUNT right now (#33); a registered phone hears it on its own socket below
 
 // ---- tonight's connections: one row per person you haunted or who haunted you ----
 const dirOf = (c) => (c.youHaunted && c.hauntedYou ? 'both' : c.youHaunted ? 'out' : 'in');

@@ -50,6 +50,11 @@ Design goals for a 4-hour build:
 | `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button; draws a matched person's costume on their face (`web/costume.js`, from the face mesh, on-device) |
 | `/me` | your card, who found you, who you found, change your costume, kill switch ("stop being findable") |
 
+Every main page (`/hunt`, `/me`, home) carries the presence chip in its header (`web/presence.js`, #33):
+"● N online / M registered", always visible; a tap opens the list of who is online (a haunt
+makes their phone shriek) and who is registered but not online. The `/hunt` card says which of
+the two the matched person is.
+
 Framework: plain Vite + vanilla TS or React, whatever Shelled produces fastest.
 No SSR needed. Everything the camera does must run after a user gesture and over
 HTTPS (camera, mic, and motion sensors are all gated on both).
@@ -119,7 +124,8 @@ then do leave the phone, so the consent screen must say so if this path is taken
 ### 1.4 Big screen (`/screen`)
 
 Same server, a route meant for a TV. Subscribes to the broadcast socket, shows:
-live event feed ("Matthew haunted Sam"), most-haunted, most-connected, headcount.
+live event feed ("Matthew haunted Sam"), most-haunted, most-connected, headcount
+(registered, online now, and the faces of who is online).
 The room scan (Gaussian splat) plugs in here later; it is not part of the core.
 
 ## 2. Data model

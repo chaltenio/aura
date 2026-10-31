@@ -8,6 +8,7 @@
   <h1>HAUNT</h1>
   <p>Point your phone at someone in the room and know who they are.</p>
   <p class="mute">Opt-in only. Faces never leave your phone.</p>
+  <button class="presence" id="presence" hidden></button>
 </header>
 <nav id="actions">
   <a class="btn" id="a-register" href="/register">Register (be findable)</a>
@@ -41,4 +42,6 @@ try {
     document.getElementById('a-register').hidden = true;
   }
 } catch {}</script>
+<script type="module">// who is on HAUNT right now (#33); this page has no socket of its own, so the chip opens one to listen
+import { mountPresence } from '/presence.js'; mountPresence(document.getElementById('presence'), { listen: true });</script>
 </body></html>
