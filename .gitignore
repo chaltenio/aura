@@ -1,0 +1,37 @@
+# dependencies / builds
+node_modules/
+dist/
+build/
+.next/
+.cache/
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# models / weights / scans (large binaries)
+*.ply
+*.spz
+*.splat
+*.ksplat
+*.glb
+*.onnx
+*.bin
+*.tflite
+models/
+weights/
+scans/
+
+# logs & run state
+*.log
+logs/
+tmp/
+.DS_Store
