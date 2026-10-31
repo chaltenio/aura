@@ -46,7 +46,7 @@ Design goals for a 4-hour build:
 
 | Route | Job |
 |---|---|
-| `/register` | OAuth login, consent toggle, selfie capture, compute embedding on-device, upload |
+| `/register` | OAuth login (its profile photo is the face signature, embedded on-device), consent toggle, selfie capture (optional when the photo has a face), upload |
 | `/hunt` | live camera, face detection + embedding, match against gallery, overlay card, haunt button |
 | `/me` | your card, who found you, who you found, kill switch ("stop being findable") |
 
@@ -86,9 +86,12 @@ than these cross-year photos, so tune the threshold on the team's faces in the
 room with `/calibrate` before the demo. Prefer false negatives over false
 positives: a wrong name on a stranger is the worst outcome.
 
-Enrollment: 3 selfies (or photos) at registration; every descriptor is stored and
-the best one wins at match time. The live selfie taken in the room's lighting is
-the one that actually matches; profile photos are often old or filtered.
+Enrollment: signed in, the provider's profile photo is embedded on the client as
+soon as `/register` loads (drawn up to 400 px first: LinkedIn sends 100x100) and is
+enough to register. Without a sign-in photo with a face: 3 selfies (or photos).
+Every descriptor is stored and the best one wins at match time. A live selfie in
+the room's lighting still matches best, since profile photos are often old or
+filtered, so `/register` keeps offering one as optional.
 
 Per video frame on `/hunt` (throttled to roughly 3 to 5 fps; more than ~8
 inferences/s thermally throttles iPhones): detect -> landmarks -> align -> embed ->
@@ -186,7 +189,9 @@ re-arms only after the card closes and that person is found again.
 3. Consent screen in plain words: "Other players' phones can recognize my face
    in this room, during this event. I can turn this off any time on /me."
    Toggle must be on to continue.
-4. Selfie: front camera, one capture, run `human.detect`, require exactly one
+4. Face signature: the client embeds the sign-in avatar by itself; with a face in
+   it, no selfie is needed. Selfie (optional then, required otherwise): front
+   camera, one capture, run `human.detect`, require exactly one
    face with a good detection score. Compute descriptor. Also compute a
    descriptor from the downloaded avatar on the server side? **No**: keep all
    embedding on the client so the server never runs a face model. The client
