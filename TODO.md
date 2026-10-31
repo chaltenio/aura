@@ -28,6 +28,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 32 | Base44 mirror: the same `web/` frontend also deployed to Base44 hosting (Base44 "Real users" challenge), calling the Fly API + WebSocket cross-origin (CORS allowlist, sign-in handoff without cookies); every push to `main` deploys Fly, then Base44 (`.github/workflows/deploy.yml`) | Matt | [x] |
 | 33 | Presence: always see who is on HAUNT right now (a haunt makes their phone shriek) and how many are registered (face known, but a haunt only waits on their card). Header chip on `/hunt`, `/me` and home opens the list; the `/hunt` card says if that person is online; `/screen` shows online now. Server: ws heartbeat, `presence` push, `GET /api/presence` | Matt | [x] |
 | 34 | Vision Pro snap mode: Safari on Apple Vision Pro only lends pages the Persona camera (never the room cameras), so `/hunt` there swaps the dead feed for snap mode: look at someone, screenshot (top button + Digital Crown), Pick photo; faces matched on the headset, card + Haunt as usual | Matt | [x] |
+| 35 | Vercel version: `/api/version` and the home page footer show the git sha on Vercel (`VERCEL_GIT_COMMIT_SHA`), no deploy number (no volume) | Chris | [ ] |
 
 ## Next
 
