@@ -7,6 +7,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mountAuth, sessionProfile } from './auth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -59,9 +60,14 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
 if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
 
-// register (manual provider; OAuth comes later)
+mountAuth(app);
+
+// register. A signed-in session (GitHub/LinkedIn) supplies provider, id, avatar and defaults; otherwise 'manual' or 'csv'.
 app.post('/api/attendee', (req, res) => {
-  const { name, handle, blurb, consent, descriptors, avatar, linkedin, provider } = req.body || {};
+  const body = req.body || {};
+  const sess = sessionProfile(req);
+  if (sess) { body.provider = sess.provider; body.providerId = sess.providerId; body.name = body.name || sess.name; body.handle = body.handle || sess.handle; body.avatar = body.avatar || sess.avatar; }
+  const { name, handle, blurb, consent, descriptors, avatar, linkedin, provider, providerId } = body;
   if (!name || typeof name !== 'string' || name.trim().length < 1) return res.status(400).json({ error: 'name required' });
   if (consent !== true) return res.status(400).json({ error: 'consent required' });
   if (!Array.isArray(descriptors) || descriptors.length < 1) return res.status(400).json({ error: 'at least one face descriptor required' });
@@ -72,7 +78,7 @@ app.post('/api/attendee', (req, res) => {
   }
   const a = {
     id: randomUUID(), token: randomBytes(16).toString('hex'),
-    provider: ['manual', 'csv', 'linkedin', 'github'].includes(provider) ? provider : 'manual',
+    provider: ['manual', 'csv', 'linkedin', 'github'].includes(provider) ? provider : 'manual', providerId: providerId ? String(providerId).slice(0, 80) : null,
     name: name.trim().slice(0, 60), handle: String(handle || '').trim().slice(0, 60),
     linkedin: /^https?:\/\/(www\.)?linkedin\.com\//.test(String(linkedin || '')) ? String(linkedin).slice(0, 200) : '',
     blurb: String(blurb || '').trim().slice(0, 200), consent: true,

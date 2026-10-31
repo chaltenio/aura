@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Point your phone at someone in the room and know who they are. Opt-in, on-device face-to-profile for events.",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "dev": "node --watch --env-file-if-exists=.env server/index.js",
     "test": "node test/smoke.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000"
   },

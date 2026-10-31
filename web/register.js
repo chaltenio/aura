@@ -56,3 +56,28 @@ $('submit').onclick = async () => {
   } catch (e) { status('Failed: ' + e.message); $('submit').disabled = false; }
 };
 if (getMe()) status('You are already registered on this phone. Registering again creates a new card.');
+
+// Optional sign-in (buttons appear only when the server has provider credentials); a session pre-fills the form
+// and offers the profile photo as one face sample.
+(async () => {
+  try {
+    const providers = await api('/api/auth/providers');
+    const session = await api('/api/session');
+    if (!providers.length && !session) return;
+    $('auth').hidden = false;
+    const labels = { linkedin: 'Sign in with LinkedIn', github: 'Sign in with GitHub' };
+    if (!session) {
+      $('auth-buttons').innerHTML = providers.map((p) => `<a href="/auth/${p}"><button class="secondary">${labels[p] || p}</button></a>`).join('');
+    } else {
+      $('auth-session').innerHTML = `Signed in as <b>${session.name}</b> via ${session.provider}${session.avatar ? ` <img src="${session.avatar}" style="width:40px;height:40px;border-radius:50%;vertical-align:middle;margin-left:8px">` : ''}`;
+      if (!$('name').value) $('name').value = session.name || '';
+      if (!$('handle').value) $('handle').value = session.handle || '';
+      refresh();
+      if (session.avatar) {
+        const b = document.createElement('button'); b.className = 'secondary'; b.textContent = 'Use my profile photo as a face sample';
+        b.onclick = async () => { b.disabled = true; const img = new Image(); img.src = session.avatar; await img.decode(); await addSample(img, 'profile photo'); };
+        $('auth-buttons').appendChild(b);
+      }
+    }
+  } catch {}
+})();
