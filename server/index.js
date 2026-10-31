@@ -16,6 +16,7 @@ const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
 const DB_PATH = join(DATA_DIR, 'db.json');
 const PORT = Number(process.env.PORT || 3000);
 const HAUNT_COOLDOWN_MS = 60_000;
+const STARTED_AT = Date.now();
 
 // ---------- FaceX weights (gitignored binaries; fetched from the FaceX GitHub release on first start) ----------
 const FACEX_DIR = join(ROOT, 'web', 'vendor', 'facex');
@@ -94,6 +95,8 @@ app.post('/api/attendee', (req, res) => {
 });
 
 // gallery: only consenting attendees, only what matching needs
+app.get('/api/version', (_req, res) => res.json({ version: process.env.APP_VERSION || 'dev', startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length }));
+
 app.get('/api/gallery', (_req, res) => {
   res.json(db.attendees.filter((a) => a.consent).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
 });

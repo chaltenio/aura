@@ -28,6 +28,7 @@ try {
     const r = await fetch(BASE + p); check(r.ok, `GET ${p} -> ${r.status}`);
   }
 
+  const ver = (await json('/api/version')).data; check(ver.version && ver.attendees === 0, '/api/version reports version and counts');
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: false, descriptors: [vec()] } })).status === 400, 'consent=false should be rejected');
   check((await json('/api/attendee', { method: 'POST', body: { name: 'X', consent: true, descriptors: [[1, 2, 3]] } })).status === 400, 'short descriptor should be rejected');
 
