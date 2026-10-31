@@ -25,6 +25,7 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - When your branch is done: `scripts/bus.sh ready "<branch>: what it does"` (the integrator merges it within a pass) or run `/merge` yourself. Both rebase onto `origin/main`, resolve conflicts keeping both sides' intent, run the test, fast-forward `main`, delete the branch and post `[MERGED]`. Never merge by hand.
 - Hooks enforce this (`.claude/settings.json`): an edit while on `main` is blocked with "On main: run /start to claim a task and create your branch"; after about 3 commits or 30 minutes on a branch the commit hook asks whether to merge back; every commit posts `[COMMIT]` and every tenth minute of prompting posts `[WORKING]` to the bus; stopping with unpushed work prints a reminder.
 - Never force-push a shared branch, never rewrite `main`, never commit `data/`, `.env`, weights, or `node_modules`.
+- Never close anything silently. Before you close a PR or issue, comment on it saying why and where the work went (e.g. "already on main as 0c350a3..681fd87"). Deleting a branch closes its open PR, so before `git push origin --delete <branch>` check `gh pr list --head <branch>` and comment on that PR first. Say the same on the bus in one line. If a branch has nothing left after rebasing onto main, it was already landed: say so, don't report it as merged.
 - If `npm test` fails on `main`, fixing it is the next thing anyone does. Say so on the bus.
 - End commit messages with the Co-Authored-By line when an agent wrote the change.
 
