@@ -17,6 +17,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 5 | Register everyone on the team: Luma + sign the pact + activate the Duck on ASI:One | each person | [ ] |
 | 6 | First Shelled run on this repo (Run 1 in docs/SHELLED_RUNS.md: narrator on `/screen`). Paste run link in PR body | tarecq | [ ] |
 | 7 | EDGE_CASES.md: first two entries from the Shelled run | tarecq | [ ] |
+| 22 | LinkedIn sign-in live on prod: LinkedIn OIDC app (redirect `https://aura-haunt.fly.dev/auth/linkedin/callback`), `LINKEDIN_CLIENT_ID/SECRET` in secrets/prod.enc.env and on Fly. Code is #8, already on main | Matt | [ ] |
 
 ## Next
 
