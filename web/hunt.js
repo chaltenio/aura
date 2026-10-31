@@ -26,7 +26,25 @@ function renderCounts() {
 }
 async function refreshGallery() { try { index = buildIndex(await api('/api/gallery')); } catch {} renderCounts(); }
 await refreshGallery();
-connectWs(me ? { attendee: me.id } : {}, (msg) => { if (msg.type === 'gallery_changed') refreshGallery(); if (msg.type === 'haunted') hauntedAlert(msg); });
+// Profile edits arrive as the changed card, applied in place: a new costume is drawn on the next frame and an open card
+// re-renders, with no gallery refetch. Someone who turns findable off is forgotten at once.
+function patchPerson(card) {
+  for (const o of index.owners) if (o.id === card.id) Object.assign(o, card); // matchOne hands these objects to the costume layer
+  if (shown?.id === card.id) renderCard(Object.assign(shown, card), shownSim);
+}
+function dropPerson(id) {
+  const keep = index.owners.map((o) => o.id !== id);
+  index = { embeddings: index.embeddings.filter((_, i) => keep[i]), owners: index.owners.filter((_, i) => keep[i]) };
+  if (shown?.id === id) closeCard(false);
+  votes.delete(id); snoozed.delete(id); renderCounts();
+}
+let hellos = 0;
+connectWs(me ? { attendee: me.id } : {}, (msg) => {
+  if (msg.type === 'attendee_changed') patchPerson(msg.attendee);
+  if (msg.type === 'attendee_gone') dropPerson(msg.id);
+  if (msg.type === 'gallery_changed' || (msg.type === 'hello' && hellos++)) refreshGallery(); // a later hello is a reconnect: catch up on what it missed
+  if (msg.type === 'haunted') hauntedAlert(msg);
+});
 
 loadEngine({ video: true, onProgress: (t) => { status(t); $('idle-sub').textContent = 'Loading face model… (first time only)'; } })
   .then((h) => { engine = h; status(`Ready (${ENGINE}). ${others()} findable people. Tap Start.`); renderCounts(); $('start').disabled = false; autoStart(); })
@@ -172,30 +190,31 @@ function cameraHelp(e) {
   return `Camera error: ${e?.message || e}`;
 }
 
-let frames = 0;
-async function loop() {
-  if (!running) return;
+let frames = 0, loopId = 0; // a new start() bumps loopId, so a timer left over from before an app switch cannot run a second loop
+async function loop(id) {
+  if (!running || id !== loopId) return;
   const v = $('video');
   if (engine && v.videoWidth) {
     const t = performance.now();
     try { const r = await processFrame(v); frames++; if (frames % 5 === 0) { const fps = (1000 / Math.max(1, performance.now() - t)).toFixed(1); const best = r.reduce((m, x) => Math.max(m, x.similarity), 0); status(`${r.length} face(s) · best ${(best * 100).toFixed(0)}% · ${fps} fps · threshold ${(THRESHOLD * 100).toFixed(0)}%`); } }
     catch (e) { status('detect error: ' + e.message); }
   }
-  setTimeout(loop, 120); // ~4 fps target; detection itself takes most of it
+  setTimeout(() => loop(id), 120); // ~4 fps target; detection itself takes most of it
 }
+let starting = false;
 async function start() {
-  if (running || !engine) return;
-  wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
+  if (running || starting || !engine) return;
+  starting = true; wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
   try {
     stream = await navigator.mediaDevices.getUserMedia(await pickRearCamera());
     $('video').srcObject = stream; await $('video').play().catch(() => {});
     $('idle').hidden = true; running = true; wakeLock();
     $('hud-state').innerHTML = '<span class="dot"></span>Scanning'; hint('Point at a face');
-    loop();
+    loop(++loopId);
   } catch (e) {
     wantRunning = false; $('idle').hidden = false; $('start').disabled = false; $('start').textContent = 'Try again';
     $('idle-sub').textContent = cameraHelp(e); status('Camera blocked: ' + e.message);
-  }
+  } finally { starting = false; }
 }
 // camera already allowed on this phone (a return visit): start without the extra tap
 async function autoStart() { try { if ((await navigator.permissions?.query({ name: 'camera' }))?.state === 'granted') start(); } catch {} }

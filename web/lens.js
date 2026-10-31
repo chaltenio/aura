@@ -488,6 +488,8 @@ export async function createLens(wrap, { onTracking } = {}) {
       if (!src.videoWidth) for (const id of [...recog.keys()]) if (!list.some((x) => x.id === id)) recog.delete(id); // a new test photo without them
       if (!raf && (recog.size || tracks.size)) raf = requestAnimationFrame(step);
     },
+    /** They took the costume off: fade their track out now. */
+    drop(id) { recog.delete(id); if (!raf && tracks.size) raf = requestAnimationFrame(step); },
     /** True while the lens is drawing this attendee (so the 2D costume should not). */
     tracking(id) { const tr = tracks.get(id); return !debug.dead && !!tr && tr.have && performance.now() - tr.seenAt < 600; },
     get dead() { return !!debug.dead; },

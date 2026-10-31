@@ -245,7 +245,7 @@ const LENS = new URLSearchParams(location.search).get('lens') !== '2d'; // ?lens
  *  (web/lens.js: tracked face paint, eyes, mouth, 3D props) draws it when it loads and can track that face; otherwise, and
  *  for any face the lens is not tracking, the flat 2D costume below draws it. */
 export function costumeLayer(wrap, { threshold = 0 } = {}) {
-  const flat = flatLayer(wrap), active = new Map(), stung = new Map(); // id -> last seen; id -> last sting
+  const flat = flatLayer(wrap), active = new Map(), stung = new Map(); // id -> { at, costume }; id -> last sting
   let lens = null, loading = false, last = null;
   const loadLens = () => {
     if (loading || !LENS) return; loading = true;
@@ -259,14 +259,15 @@ export function costumeLayer(wrap, { threshold = 0 } = {}) {
         loadLens(); // first frame: start fetching the lens in the background (cached after the first visit)
         const now = performance.now(), list = [];
         for (const r of results) {
-          const a = r.attendee, costume = a && COSTUMES[a.costume];
+          const a = r.attendee, costume = a && COSTUMES[a.costume], was = a && active.get(a.id);
+          if (a && !costume && was) { active.delete(a.id); flat.release(a.id); lens?.drop(a.id); continue; } // took it off on /me while in view: fade now
           if (!costume || r.similarity < threshold) continue;
-          if (!active.has(a.id) && !isConfirmed(a.id)) continue;
-          if (!active.has(a.id) && now - (stung.get(a.id) ?? -Infinity) > STING_GAP_MS) { stung.set(a.id, now); playSting(a.costume); }
-          active.set(a.id, now); list.push({ id: a.id, costume: a.costume, box: r.box, mesh: r.mesh });
+          if (!was && !isConfirmed(a.id)) continue;
+          if (was ? was.costume !== a.costume : now - (stung.get(a.id) ?? -Infinity) > STING_GAP_MS) { stung.set(a.id, now); playSting(a.costume); } // first sight, or switched on /me while in view
+          active.set(a.id, { at: now, costume: a.costume }); list.push({ id: a.id, costume: a.costume, box: r.box, mesh: r.mesh });
         }
         last = { source, list };
-        for (const [id, t] of active) if (now - t > 1500) active.delete(id);
+        for (const [id, x] of active) if (now - x.at > 1500) active.delete(id);
         if (lens && !lens.dead) { lens.update(source, list); flat.update(source, list.filter((x) => !lens.tracking(x.id))); }
         else flat.update(source, list);
       } catch (err) { console.warn('costume update', err); } // a costume bug must never stop matching
