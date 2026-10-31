@@ -46,3 +46,8 @@ python3 -m json.tool .claude/settings.json >/dev/null && echo settings ok
 Exit 2 from a PreToolUse hook blocks the tool call and shows stderr to Claude; exit 0 with a JSON object on
 stdout injects `additionalContext` (PostToolUse, UserPromptSubmit) or a `systemMessage` (Stop). Every script
 finishes in well under a second; network work (`bus.sh`, `git fetch`) is always backgrounded.
+
+
+## First-prompt steer (added 2026-10-31)
+
+The UserPromptSubmit hook also fires once per session (marker `.bus/started-<session>`): on the first prompt it tells Claude to run `/start` immediately (greeting, fit interview, claim, branch) and prints the live app URL from `fly.toml` for phone testing. Skipped when `INTEGRATOR=1` or `MERGE_SKILL=1`. The SessionStart hook prints the same live URL and the deployed version at the top of every session.

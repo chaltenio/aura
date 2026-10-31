@@ -16,19 +16,19 @@ scripts/bus.sh since 2>/dev/null | tail -n 20 || scripts/bus.sh read 12
 sed -n '/^## STATUS/,/^## Next/p' TODO.md          # STATUS paragraph + Now table
 sed -n '/^## Next/,/^## Done/p' TODO.md             # Next table
 sed -n '/^## 3/,/^## 4/p' IDEAS.md                 # the pickable backlog (table: idea, what, why, needs, effort, track)
-[ -f docs/DEPLOY.md ] && grep -m2 -i "https://" docs/DEPLOY.md
+app=$(sed -n 's/^app = "\(.*\)"/\1/p' fly.toml); live="https://${app:-aura-haunt}.fly.dev"; echo "$live $(curl -s --max-time 3 $live/api/version)"   # the live app; every merge to main redeploys it
 for b in $(git branch -r --no-merged origin/main | grep -v HEAD); do echo "$b ahead=$(git rev-list --count origin/main..$b) last=$(git log -1 --format=%cr $b) files=$(git diff --name-only origin/main...$b | tr '\n' ' ' | cut -c1-120)"; done
 git config user.name; gh api user --jq .login 2>/dev/null
 name=$(gh api user --jq .login 2>/dev/null || git config user.name | tr ' ' '-' | tr 'A-Z' 'a-z')
 git branch --list "$name/*"; git branch -r --no-merged origin/main | grep "origin/$name/"     # branches this person already has
 ```
-Unclaimed = rows of the IDEAS.md section 3 table whose idea name does not appear in TODO.md Now or Done, plus TODO.md Next rows with an empty Owner cell. Cross out anything already claimed. Live URL = the first https URL in docs/DEPLOY.md, else the one in STATUS, else "nothing deployed yet".
+Unclaimed = rows of the IDEAS.md section 3 table whose idea name does not appear in TODO.md Now or Done, plus TODO.md Next rows with an empty Owner cell. Cross out anything already claimed. Live URL = `https://<fly.toml app>.fly.dev` (currently https://aura-haunt.fly.dev); say it with the deployed version so people test on real phones from the first minute. Fallback for a laptop-only server: `npm run tunnel`.
 
 ## 2. Greet (five lines, then one question)
 
 ```
 Hi <first name>. <time> on <date>.
-Live: <URL or "nothing deployed; local + tunnel only">. Main is <green/red per last integrator line>.
+Live: <URL> (deployed <sha>, use it on your phone for testing). Main is <green/red per last integrator line>.
 Claimed: <name>: <task> (<files>); <name>: <task>.
 Unclaimed: <#> <task>; <#> <task>; <#> <task>.
 In flight: <branch> (<owner>, <ahead> commits, <files>) ...

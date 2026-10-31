@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 12; post with scripts/bus.sh post|claim|ask):' && scripts/bus.sh read 12 2>/dev/null; echo; echo 'TODO.md STATUS + Now:'; sed -n '/^## STATUS/,/^## Next/p' TODO.md | sed '1d;$d'; echo; echo 'Branches in flight (unmerged into origin/main):'; for b in $(git branch -r --no-merged origin/main 2>/dev/null | grep -v HEAD); do echo \"  $b  ahead=$(git rev-list --count origin/main..$b)  last=$(git log -1 --format=%cr $b)\"; done; echo; echo 'Project convention for this session: this Claude is the steering agent for the teammate who just came online. In a fresh session (startup, resume, clear) the first action is the /start conversation from .claude/skills/start/SKILL.md: a five-line greeting built from the state above, then one question, what do you want to build, with the top three unclaimed TODO items as choices. If the first user message is already a concrete task, the greeting is skipped, but the task is still claimed on the bus and given its own branch before any file is edited. Nobody edits on main.'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && app=$(sed -n 's/^app = \"\\(.*\\)\"/\\1/p' fly.toml 2>/dev/null); live=\"https://${app:-aura-haunt}.fly.dev\"; echo \"LIVE APP (use this for testing on phones): $live  (/register, /hunt, /me, /screen)  deployed: $(curl -s --max-time 2 $live/api/version 2>/dev/null || echo unreachable)\"; echo; echo 'TEAM BUS (last 12; post with scripts/bus.sh post|claim|ask):' && scripts/bus.sh read 12 2>/dev/null; echo; echo 'TODO.md STATUS + Now:'; sed -n '/^## STATUS/,/^## Next/p' TODO.md | sed '1d;$d'; echo; echo 'Branches in flight (unmerged into origin/main):'; for b in $(git branch -r --no-merged origin/main 2>/dev/null | grep -v HEAD); do echo \"  $b  ahead=$(git rev-list --count origin/main..$b)  last=$(git log -1 --format=%cr $b)\"; done; echo; echo 'Project convention for this session: this Claude is the steering agent for the teammate who just came online. In a fresh session (startup, resume, clear) the first action is the /start conversation from .claude/skills/start/SKILL.md: a five-line greeting built from the state above, then one question, what do you want to build, with the top three unclaimed TODO items as choices. If the first user message is already a concrete task, the greeting is skipped, but the task is still claimed on the bus and given its own branch before any file is edited. Nobody edits on main.'"
           }
         ]
       },
@@ -18,43 +18,6 @@
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 6):' && scripts/bus.sh read 6 2>/dev/null | head -n 6; echo 'Branch:' $(git branch --show-current)"
           }
         ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/post-commit-bus.sh",
-            "async": true,
-            "timeout": 20
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/prompt-bus.sh",
-            "async": true,
-            "timeout": 20
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/pre-edit-guard.sh\"",
-            "timeout": 10
-          }
-        ],
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit"
       }
     ],
     "PostToolUse": [
@@ -78,6 +41,18 @@
             "timeout": 10
           }
         ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/pre-edit-guard.sh\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit"
       }
     ],
     "Stop": [

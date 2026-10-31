@@ -16,9 +16,18 @@ if [ ${#prompt} -ge 15 ] && [ -n "$gist" ]; then
 fi
 # (b) fetch in the background every 10 minutes; report drift based on the last completed fetch
 if [ "$(file_age .bus/last-fetch)" -gt 600 ]; then touch .bus/last-fetch; nohup git fetch -q origin >/dev/null 2>&1 & fi
+ctx=""
 n=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
 if [ "${n:-0}" -gt 0 ]; then
-  if [ "$branch" = "main" ]; then json_out_ctx UserPromptSubmit "Local main is $n commits behind origin/main; run \`git pull --ff-only\` (and remember: edits happen on a branch, see /start)."
-  else json_out_ctx UserPromptSubmit "origin/main has $n new commits since this branch's base; run scripts/sync.sh before editing so you build on current code."; fi
+  if [ "$branch" = "main" ]; then ctx="Local main is $n commits behind origin/main; run \`git pull --ff-only\` (and remember: edits happen on a branch, see /start)."
+  else ctx="origin/main has $n new commits since this branch's base; run scripts/sync.sh before editing so you build on current code."; fi
 fi
+# (c) first prompt of this session: the steering interview fires now, whatever the prompt says
+first=".bus/started-${session:-nosession}"
+if [ ! -e "$first" ] && [ -z "$INTEGRATOR" ] && [ -z "$MERGE_SKILL" ]; then
+  touch "$first"
+  app=$(sed -n 's/^app = "\(.*\)"/\1/p' fly.toml 2>/dev/null); live="https://${app:-aura-haunt}.fly.dev"
+  ctx="FIRST PROMPT OF THIS SESSION. Before anything else, run the /start skill (Skill tool, name: start): greet with the live state, interview the idea for fit, claim it on the bus, create the branch. If this prompt is already a concrete task, keep the greeting to two lines but still claim and branch before editing; if it is a tiny fix on a file this person owns, claim and branch, no interview. Live app for any testing: $live (register at /register, hunt at /hunt, screen at /screen; /api/version shows the deployed commit). $ctx"
+fi
+[ -n "$ctx" ] && json_out_ctx UserPromptSubmit "$ctx"
 exit 0
