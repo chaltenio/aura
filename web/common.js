@@ -63,8 +63,18 @@ export function toast(html, ms = 5000) {
 }
 export function hauntedAlert(msg) {
   shriek(); flash();
-  const by = msg.by || {};
-  toast(`<b>👻 You've been haunted by ${esc(by.name || 'someone')}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}`);
+  const by = msg.by || {}; const name = esc(by.name || 'someone');
+  const canBack = !msg.back && by.id && getMe(); // a haunt back gets no button, so it can't ping-pong
+  toast(`<b>${msg.back ? `👻 ${name} haunted you back!` : `👻 You've been haunted by ${name}`}</b>${by.handle ? ` <span class="mute">@${esc(by.handle)}</span>` : ''}${by.blurb ? `<div class="mute">${esc(by.blurb)}</div>` : ''}${canBack ? '<button class="haunt-back">Haunt back</button>' : ''}`, 12000);
+  const btn = canBack && document.querySelector('.toast .haunt-back');
+  if (btn) btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = await hauntBack(by); });
+}
+/** Haunt back whoever haunted this phone (`by` = card from the haunted push). Call from a tap. Returns a short status for the UI. */
+export async function hauntBack(by) {
+  const me = getMe(); if (!me) return 'Register on this phone first';
+  unlockAudio(); // inside the tap: also arms sound on this phone so the next haunt is heard
+  try { await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: by?.id, similarity: null, back: true } }); return 'Haunted back 👻'; }
+  catch (e) { return e.status === 404 ? "They've vanished" : e.status === 429 ? 'Already haunted them' : 'Failed: ' + e.message; }
 }
 export async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch {} }
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
