@@ -20,7 +20,8 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 22 | Costumes: optional look picked at `/register` or `/me` (Vampire, Witch, Demon, Ghost, Skeleton, Pumpkin; default Plain). `/hunt` draws it on your matched face from the face mesh (on-device) with a sting and a card title | Matt | [x] |
 | 25 | Sound + vibrate on by default: a haunt shrieks and vibrates (Android) without the "arm sound" tap on `/me`; the first tap anywhere arms audio | Matt | [x] |
 | 27 | LinkedIn: sign-in live on prod (app HAUNT, redirect `https://aura-haunt.fly.dev/auth/linkedin/callback`, `LINKEDIN_CLIENT_ID/SECRET` in secrets/prod.enc.env and on Fly); signed in, the profile photo is the face signature and selfies are optional | Matt | [ ] |
-| 28 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [ ] |
+| 28 | Deploy version: the home page footer shows `v<N> · <sha> · deployed <time>`; N goes up by one on every deploy (counter in `data/version.json`, bumped at boot when the deployed image changes); `/api/version` gains `deploy`, `deployedAt` | Matt | [ ] |
+| 29 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [ ] |
 
 ## Next
 
