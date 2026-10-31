@@ -4,7 +4,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 
 ## STATUS
 
-**2026-10-31 14:20 PT.** LIVE: https://aura-haunt.fly.dev runs ef65075, which is current `main`; `/api/version` and `/api/gallery` answer, FaceX wasm and weights are served, every push to `main` deploys, CI green. On `main`: FaceX hybrid engine, Express + ws server (gallery, haunt push, cooldown, kill switch, `/api/version`), API smoke test (no browser e2e yet), four sign-in providers behind env vars, branch-first hooks, `/start` interview with `[PLAN]` lines, session launcher. Second track decided 14:14: Fetch.ai as the Scout (IDEAS.md 2b, tarecq, #10 claimed; slice 1 is `server/scout.js` pairwise scoring + clue over `state`). Rows #17-20 (Most Wanted, Haunt back, connections on `/me`, post-event digest) are unclaimed. Drift: ARCHITECTURE.md still lacks `GET /api/version` (Matt). No Shelled run yet; EDGE_CASES.md is the template (#6/#7, tarecq). Branches ahead of main: matt/next and tarecq/next, each one INTEGRATION_LOG line; both append the same file, keep both on rebase. `chris/oauth-setup-docs` is on main and can be deleted. Nobody blocked.
+**2026-10-31 14:34 PT.** LIVE: https://aura-haunt.fly.dev runs 50e4ed5, which is current `main`; CI green, every push deploys. On `main`: FaceX hybrid engine, Express + ws server (gallery, haunt push, cooldown, kill switch, `/api/version`), API smoke test, four sign-in providers behind env vars, branch-first hooks, `/start` interview, launcher. In flight: Matt on #18 haunt back (`matt/haunt-back`: web/common.js, `/api/haunt` with back:true, smoke, ARCHITECTURE.md, DEMO.md) and #19 tonight's connections (`matt/connections`: web/me.*, app.css, `/api/me`, smoke); both touch server/index.js and test/smoke.mjs, so the second to land syncs first. tarecq on #10 Scout design (three explorations into docs/scout/*.md) before code; Scout code will touch server/scout.js, web/hunt.js, ARCHITECTURE.md. #17 Most Wanted and #20 digest are unclaimed. Drift: ARCHITECTURE.md still lacks `GET /api/version` (Matt). No Shelled run yet; EDGE_CASES.md is the template (#6/#7, tarecq). matt/next (42 min) and tarecq/next (18 min) hold one log line each. `chris/oauth-setup-docs` is on main and can be deleted. Nobody blocked.
 
 ## Now (this hour)
 
@@ -32,8 +32,8 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 15 | Proof of launch: X post or 2-minute demo video; screenshots of Shelled runs | | [ ] |
 | 16 | Feedback swap with one other team (Stranger Builds requirement) and one change from it | | [ ] |
 | 17 | Most Wanted bounty: server picks a consenting attendee every 5 min, `state` broadcast, `/screen` banner, first haunt scores 3 (IDEAS.md 3) | | [ ] |
-| 18 | Haunt back: one button on the `haunted` notification that haunts the hunter back (IDEAS.md 3) | | [ ] |
-| 19 | Tonight's connections on `/me`: who you haunted / were haunted by, links, copy as text (IDEAS.md 3) | | [ ] |
+| 18 | Haunt back: one button on the `haunted` notification that haunts the hunter back (IDEAS.md 3) | Matt | [ ] |
+| 19 | Tonight's connections on `/me`: who you haunted / were haunted by, links, copy as text (IDEAS.md 3) | Matt | [ ] |
 | 20 | Post-event digest: Claude writes "who you met tonight" from events + profiles only (IDEAS.md 3) | | [ ] |
 
 ## Done
@@ -50,5 +50,6 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 - Face matching is on-device only. No face image or embedding reaches a hosted model.
 - Second track is **Fetch.ai**, built as the Scout (IDEAS.md 2b): the agent pairs people and gives clues, the camera finds them, the haunt is the ground truth. Clues come from profiles and public GitHub only, never from faces. (14:20, tarecq)
 - The Scout adds `POST /api/rating`, a `match` event and a clue payload on `state`; ARCHITECTURE.md changes in the same commit as the code (tarecq's [PLAN], 14:14).
+- Haunt back adds `back:true` on `POST /api/haunt` and a haunted-back push; connections adds `GET /api/me/:id`. Both land in ARCHITECTURE.md in the same commit as the code (Matt's [PLAN]s, 14:31).
 - Never close a PR or issue, or delete a branch, without a comment saying why and where the work went (13:51, CLAUDE.md). `/merge` and the integrator comment on the open PR before deleting its branch.
 
