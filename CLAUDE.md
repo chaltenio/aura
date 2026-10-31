@@ -15,6 +15,8 @@ Read README.md, then ARCHITECTURE.md (the contract), then TODO.md (who is doing 
 - Stage explicitly (`git add <paths>`), never `git add -A`; teammates have uncommitted work in the same tree.
 - Direct to `main`, no feature branches, for this hackathon. Branch only for a risky spike you may throw away.
 - Before every push: `scripts/sync.sh` (= `git pull --rebase`, run `npm test` if present, `git push`). Pull-rebase first, always.
+- Push after every atomic commit with `scripts/sync.sh`. Unpushed work is invisible to the team and the integrator.
+- Never let local work sit unpushed for more than 15 minutes or across a context switch. Before leaving the keyboard, push.
 - Never force-push, never rewrite shared history, never commit `data/`, `.env`, weights, or `node_modules`.
 - If `npm test` fails on main, fixing it is the next thing anyone does. Say so in the room.
 - End commit messages with the Co-Authored-By line when an agent wrote the change.
