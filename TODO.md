@@ -23,6 +23,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 26 | UI/UX pass: drive every page in an emulated phone (iPhone + Pixel, fake camera) and fix the clunky parts: register, hunt, screen, calibrate, index, app.css | Matt | [ ] |
 | 28 | Deploy version: the home page footer shows `v<N> · <sha> · deployed <time>`; N goes up by one on every deploy (counter in `data/version.json`, bumped at boot when the deployed image changes); `/api/version` gains `deploy`, `deployedAt` | Matt | [x] |
 | 29 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [x] |
+| 32 | Base44 mirror: the same `web/` frontend also deployed to Base44 hosting (Base44 "Real users" challenge), calling the Fly API + WebSocket cross-origin (CORS allowlist, sign-in handoff without cookies); every push to `main` deploys Fly, then Base44 (`.github/workflows/deploy.yml`) | Matt | [ ] |
 
 ## Next
 
