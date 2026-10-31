@@ -24,6 +24,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 28 | Deploy version: the home page footer shows `v<N> · <sha> · deployed <time>`; N goes up by one on every deploy (counter in `data/version.json`, bumped at boot when the deployed image changes); `/api/version` gains `deploy`, `deployedAt` | Matt | [x] |
 | 29 | Auto-ready: a finished job runs `scripts/ready.sh` by itself (sync, test, push, open the PR, post [READY]); `/merge` and the integrator land the PR's own head so GitHub shows it merged | Matt | [x] |
 | 30 | Instant profile updates: a `/me` edit (costume, GitHub handle, LinkedIn, findable) shows on every open phone at once. The server pushes the changed card (`attendee_changed`, or `attendee_gone {id}` on opt-out) instead of making every `/hunt` refetch the whole gallery; `/hunt` redraws the costume on the next frame and re-renders an open card; `/me` shows the save at once and the GitHub profile arrives by push | Matt | [x] |
+| 33 | Presence: always see who is on HAUNT right now (a haunt makes their phone shriek) and how many are registered (face known, but a haunt only waits on their card). Header chip on `/hunt`, `/me` and home opens the list; the `/hunt` card says if that person is online; `/screen` shows online now. Server: ws heartbeat, `presence` push, `GET /api/presence` | Matt | [ ] |
 
 ## Next
 
