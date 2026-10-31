@@ -40,7 +40,7 @@ if (!me) { $('nocard').hidden = false; } else {
       if (card.avatar) { $('avatar').src = card.avatar; $('avatar').hidden = false; $('noavatar').hidden = true; }
       $('consent').checked = card.consent;
       $('profile').innerHTML = renderProfile(card) || '<span class="mute">Add your GitHub handle below to show your profile on your card.</span>';
-      if (document.activeElement !== $('handle')) $('handle').value = card.handle || '';
+      if (document.activeElement !== $('ghhandle')) $('ghhandle').value = card.handle || '';
       if (document.activeElement !== $('linkedin')) $('linkedin').value = card.linkedin || '';
       conns = connections;
       $('nconn').textContent = `(${connections.length})`;
@@ -56,7 +56,7 @@ if (!me) { $('nocard').hidden = false; } else {
   $('copy').onclick = async () => say($('copy'), (await copyText(connsText(conns))) ? 'Copied ✓' : 'Copy failed');
   if (navigator.share) { $('share').hidden = false; $('share').onclick = () => navigator.share({ title: 'Tonight at HAUNT', text: connsText(conns) }).catch(() => {}); }
   $('arm').onclick = () => { unlockAudio(); $('arm').textContent = '🔊 Sound armed. Keep this page open.'; };
-  $('save').onclick = async () => { $('save').disabled = true; try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, handle: $('handle').value, linkedin: $('linkedin').value } }); await new Promise((r) => setTimeout(r, 1500)); await render(); } finally { $('save').disabled = false; } };
+  $('save').onclick = async () => { $('save').disabled = true; try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, handle: $('ghhandle').value, linkedin: $('linkedin').value } }); await new Promise((r) => setTimeout(r, 1500)); await render(); } finally { $('save').disabled = false; } };
   $('consent').onchange = async (e) => { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: e.target.checked } }); };
   $('forget').onclick = async () => { try { await api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, consent: false } }); } catch {} clearMe(); location.href = '/'; };
 }

@@ -74,7 +74,7 @@ export async function hauntBack(by) {
   const me = getMe(); if (!me) return 'Register on this phone first';
   unlockAudio(); // inside the tap: also arms sound on this phone so the next haunt is heard
   try { await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: by?.id, similarity: null, back: true } }); return 'Haunted back 👻'; }
-  catch (e) { return e.status === 404 ? "They've vanished" : e.status === 429 ? 'Already haunted them' : 'Failed: ' + e.message; }
+  catch (e) { return e.status === 404 ? "They've vanished" : 'Failed: ' + e.message; }
 }
 export async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch {} }
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

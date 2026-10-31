@@ -75,14 +75,12 @@ flowchart LR
       stat["static web/ (extensions: html)<br/>/vendor/facex: facex.js, facex.wasm (align.js, detect.js unused)<br/>edgeface_xs_fp32.bin (gitignored)"]
       api["JSON API (5 MB body limit)<br/>POST /api/attendee, GET /api/gallery<br/>GET /api/attendee/:id, GET /api/me/:id<br/>PATCH /api/attendee/:id, POST /api/haunt<br/>GET /api/events"]
       wsrv["WebSocket /ws (server to client only)<br/>?attendee=id into sockets map<br/>?screen=1 into screens set<br/>sendTo(), broadcast(), broadcastScreen()"]
-      cool["in-memory haunt cooldown<br/>60 s per actor:target pair"]
     end
     db[("data/db.json<br/>attendees[], events[]<br/>debounced write, 50 ms")]
     cfd --> stat
     cfd --> api
     cfd --> wsrv
     api --> db
-    api --> cool
     api -- "sendTo / broadcast / broadcastScreen" --> wsrv
   end
   cf --> cfd
@@ -166,15 +164,11 @@ sequenceDiagram
 
   Note over A,T: Haunt (Bob taps the button)
   B->>S: POST /api/haunt {actorId: bobId, token, targetId: aliceId, similarity}
-  S->>S: check token, target consent, not self, 60 s cooldown per actor:target
-  alt cooldown still active
-    S-->>B: 429 {error: cooldown, card}
-  else accepted
-    S->>D: push event {type: haunt, actorId, targetId, similarity, createdAt}, save()
-    S->>A: ws haunted {by: Bob public card, at}
-    S->>T: ws event {event with actor and target cards}
-    S-->>B: {ok: true, card}
-  end
+  S->>S: check token, target consent, not self. No rate limit, so a repeat haunt goes through too
+  S->>D: push event {type: haunt, actorId, targetId, similarity, createdAt}, save()
+  S->>A: ws haunted {by: Bob public card, at}
+  S->>T: ws event {event with actor and target cards}
+  S-->>B: {ok: true, card}
   A->>A: hauntedAlert(): shriek() + vibrate, flash(), toast with Bob's card
   A->>S: GET /api/me/:id?token=... to re-render received haunts
   T->>T: prepend feed item, recount haunts, rebuild top lists
@@ -230,7 +224,7 @@ from `web/` with the `.html` extension implied, so `/hunt` serves `web/hunt.html
 | GET | `/api/attendee/:id` | none | public card | `id, name, handle, blurb, linkedin, avatar, consent, hauntedCount, huntCount`. Used by `/hunt` to fill the card sheet. |
 | GET | `/api/me/:id` | `?token=` | `{me, received[], given[]}` | 403 if the token does not match. Each event is enriched with the other party's public card, newest first. |
 | PATCH | `/api/attendee/:id` | `{token, consent?, blurb?}` | public card | Kill switch. Broadcasts `gallery_changed` so every `/hunt` refetches. "Forget me" on `/me` sends `consent: false` then clears local storage. |
-| POST | `/api/haunt` | `{actorId, token, targetId, similarity}` | `{ok: true, card}` | 403 bad token, 404 target missing or hidden, 400 self-haunt, 429 within the 60 s per-pair cooldown (still returns the card). Writes the event, pushes `haunted` to the target and `event` to screens. |
+| POST | `/api/haunt` | `{actorId, token, targetId, similarity}` | `{ok: true, card}` | 403 bad token, 404 target missing or hidden, 400 self-haunt. No rate limit: a repeat haunt on the same person is accepted like the first. Writes the event, pushes `haunted` to the target and `event` to screens. |
 | GET | `/api/events` | `?limit=` (default 50, max 500) | `{events[], attendees[]}` | Newest first, each with actor and target cards, plus the consenting attendee cards. Bootstraps `/screen`. |
 | WS | `/ws` | `?attendee=<id>` and/or `?screen=1` | server to client only | Client messages are ignored. See the table below. |
 
