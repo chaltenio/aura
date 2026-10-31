@@ -1,4 +1,5 @@
 import { api, getMe, clearMe, connectWs, unlockAudio, hauntedAlert, esc, fmtTime, renderProfile } from '/common.js';
+import { costumePicker } from '/costume.js';
 const $ = (id) => document.getElementById(id);
 const me = getMe();
 
@@ -32,6 +33,7 @@ const say = (btn, label) => { if (!btn.dataset.label) btn.dataset.label = btn.te
 if (!me) { $('nocard').hidden = false; } else {
   $('has').hidden = false;
   let conns = [];
+  const costume = costumePicker($('costume'), { name: () => $('name').textContent || me.name, onPick: (c) => api(`/api/attendee/${me.id}`, { method: 'PATCH', body: { token: me.token, costume: c } }).catch(() => {}) });
   const render = async () => {
     try {
       const { me: card, connections = [] } = await api(`/api/me/${me.id}?token=${encodeURIComponent(me.token)}`);
@@ -39,6 +41,7 @@ if (!me) { $('nocard').hidden = false; } else {
       $('stats').textContent = `haunted ${card.hauntedCount}× · hunted ${card.huntCount}×`;
       if (card.avatar) { $('avatar').src = card.avatar; $('avatar').hidden = false; $('noavatar').hidden = true; }
       $('consent').checked = card.consent;
+      costume.set(card.costume);
       $('profile').innerHTML = renderProfile(card) || '<span class="mute">Add your GitHub handle below to show your profile on your card.</span>';
       if (document.activeElement !== $('ghhandle')) $('ghhandle').value = card.handle || '';
       if (document.activeElement !== $('linkedin')) $('linkedin').value = card.linkedin || '';
