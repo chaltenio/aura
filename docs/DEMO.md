@@ -4,7 +4,7 @@
 1. Server up: Fly URL from `scripts/deploy.sh status`, or `npm start` + `npm run tunnel` on a laptop.
 2. Open `/screen` on the TV. It shows the join QR, counters and the live feed.
 3. Two team members already registered with 3 selfies each (lighting of the room, not a hallway).
-4. Phones: sound on, ringer switch not on silent, `/me` open on the "victim" phone with sound armed.
+4. Phones: sound on, ringer switch not on silent, `/me` open on the "victim" phone and tapped once (button reads "Sound on. Keep this page open.").
 
 ## The 2 minutes
 | t | Say | Do |
