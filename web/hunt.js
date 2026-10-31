@@ -1,62 +1,129 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
-import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, esc, renderProfile } from '/common.js';
+import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, renderProfile } from '/common.js';
 
 const $ = (id) => document.getElementById(id);
-const status = (t) => { $('status').textContent = t; };
+const status = (t) => { $('status').textContent = t; };                          // small numbers line under the camera
+const hint = (t) => { if ($('hint').textContent !== t) $('hint').textContent = t; }; // plain-words line inside the camera
+const firstName = (n) => String(n || '').trim().split(/\s+/)[0];
 const VOTES_NEEDED = 3;
-let engine = null, index = buildIndex([]), stream = null, running = false;
-const votes = new Map(); // attendeeId -> consecutive frames
-let shown = null, shownSim = 0, lastShownAt = 0;
+const GONE_MS = 2500;      // a closed card re-arms once that person has been out of frame this long
+const AUTO_CLOSE_MS = 15000; // an untouched card closes after its person has been out of frame this long
+let engine = null, index = buildIndex([]), stream = null, running = false, wantRunning = false;
+const votes = new Map();   // attendeeId -> consecutive frames
+const snoozed = new Map(); // attendeeId -> last seen while their card is closed (Close, or after a haunt)
+let shown = null, shownSim = 0, lastSeenShown = 0, sheetTouched = false, closeTimer = 0;
 const me = getMe();
+if (!me) { $('melink').textContent = 'Register'; $('melink').href = '/register'; }
 
-async function refreshGallery() { try { index = buildIndex(await api('/api/gallery')); } catch {} }
+const others = () => new Set(index.owners.filter((o) => o.id !== me?.id).map((o) => o.id)).size;
+function renderCounts() {
+  if (!engine) return;
+  const n = others();
+  $('hud-count').textContent = `${n} findable`;
+  $('idle-sub').textContent = n ? `${n} ${n === 1 ? 'person' : 'people'} here can be found.` : 'Nobody else is findable yet. Ask people to scan the QR and register.';
+}
+async function refreshGallery() { try { index = buildIndex(await api('/api/gallery')); } catch {} renderCounts(); }
 await refreshGallery();
 connectWs(me ? { attendee: me.id } : {}, (msg) => { if (msg.type === 'gallery_changed') refreshGallery(); if (msg.type === 'haunted') hauntedAlert(msg); });
 
-loadEngine({ video: true, onProgress: status }).then((h) => { engine = h; status(`Ready (${ENGINE}). ${index.owners.length ? new Set(index.owners.map(o => o.id)).size : 0} findable people. Tap Start.`); }).catch((e) => status('Model failed: ' + e.message));
+loadEngine({ video: true, onProgress: (t) => { status(t); $('idle-sub').textContent = 'Loading face model… (first time only)'; } })
+  .then((h) => { engine = h; status(`Ready (${ENGINE}). ${others()} findable people. Tap Start.`); renderCounts(); $('start').disabled = false; autoStart(); })
+  .catch((e) => {
+    status('Model failed: ' + e.message);
+    $('idle-sub').textContent = "The face model didn't load. Check your connection and reload.";
+    $('start').textContent = 'Reload'; $('start').disabled = false; $('start').onclick = () => location.reload();
+  });
 
 let shownId = null, hauntSent = false;
 function renderCard(att, sim) {
   $('c-name').textContent = att.name; $('c-handle').textContent = att.handle ? '@' + att.handle : ''; $('c-blurb').textContent = att.blurb || '';
-  $('c-sim').textContent = `match ${(sim * 100).toFixed(0)}%`;
+  $('c-sim').textContent = `${(sim * 100).toFixed(0)}% match`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
   $('c-profile').innerHTML = renderProfile(att);
 }
 function showCard(att, sim) {
   const changed = shownId !== att.id;
-  shown = att; shownSim = sim; lastShownAt = Date.now(); shownId = att.id;
+  shown = att; shownSim = sim; lastSeenShown = Date.now(); shownId = att.id;
   renderCard(att, sim);
   if (changed) { // reset the haunt button only when a different person appears, never on a lazy card refresh
-    hauntSent = false;
-    $('haunt').disabled = !me || me.id === att.id; $('haunt').textContent = !me ? 'Register to haunt' : me.id === att.id ? "That's you" : '👻 Haunt them';
+    hauntSent = false; sheetTouched = false; clearTimeout(closeTimer);
+    const b = $('haunt'); b.className = '';
+    b.disabled = !!me && me.id === att.id;
+    b.textContent = !me ? 'Register to haunt them' : me.id === att.id ? "That's you 👋" : `👻 Haunt ${firstName(att.name)}`;
     api(`/api/attendee/${att.id}`).then((card) => { if (shownId === card.id) renderCard(Object.assign(att, card), shownSim); }).catch(() => {});
+    try { navigator.vibrate?.(30); } catch {}
   }
-  $('sheet').classList.add('show');
+  $('sheet').classList.add('show'); hint('');
 }
-$('dismiss').onclick = () => { $('sheet').classList.remove('show'); shown = null; shownId = null; votes.clear(); };
+/** Close the card. snooze: that person's card stays closed until they leave the frame (or the camera is tapped). */
+function closeCard(snooze = true) {
+  if (shown && snooze) snoozed.set(shown.id, Date.now());
+  $('sheet').classList.remove('show'); shown = null; shownId = null; votes.clear(); clearTimeout(closeTimer);
+}
+$('dismiss').onclick = () => closeCard(true);
+$('grab').onclick = () => closeCard(true);
+$('sheet').addEventListener('pointerdown', () => { sheetTouched = true; });
+// tap the camera to reopen a card you closed while that person is still in view
+$('wrap').addEventListener('click', () => {
+  if (!running || shown) return;
+  const id = [...votes.keys()].find((k) => snoozed.has(k));
+  if (id) { snoozed.delete(id); votes.set(id, VOTES_NEEDED); }
+});
+function boo(el) {
+  const r = el.getBoundingClientRect(); const s = document.createElement('span');
+  s.className = 'boo'; s.textContent = '👻'; s.style.left = `${r.left + r.width / 2}px`; s.style.top = `${r.top - 30}px`;
+  document.body.appendChild(s); setTimeout(() => s.remove(), 1200);
+}
 $('haunt').onclick = async () => {
-  if (!shown || !me || hauntSent) return; $('haunt').disabled = true; hauntSent = true;
-  try { await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: shown.id, similarity: shownSim } }); $('haunt').textContent = `You haunted ${shown.name} 👻`; }
-  catch (e) { $('haunt').textContent = 'Failed: ' + e.message; }
+  if (!shown) return;
+  if (!me) { location.href = '/register'; return; }
+  if (hauntSent) return;
+  const b = $('haunt'), target = shown; b.disabled = true; hauntSent = true; b.textContent = 'Haunting…';
+  try {
+    await api('/api/haunt', { method: 'POST', body: { actorId: me.id, token: me.token, targetId: target.id, similarity: shownSim } });
+    if (shownId !== target.id) return;
+    b.className = 'ok'; b.textContent = `✓ ${firstName(target.name)} is haunted 👻`; boo(b);
+    closeTimer = setTimeout(() => { if (shownId === target.id) closeCard(true); }, 3500);
+  } catch (e) {
+    if (shownId !== target.id) return;
+    if (e.status === 404) { b.textContent = `${firstName(target.name)} just vanished (not findable)`; return; }
+    if (e.status === 403) { b.textContent = 'Your card is gone. Register again to haunt'; return; }
+    hauntSent = false; b.disabled = false; b.textContent = `Didn't send (${e.message}). Tap to retry`;
+  }
 };
 
 /** Shared by the live loop and the photo test. Returns per-face results. */
 export async function processFrame(source) {
   const faces = await engine.detect(source);
   const results = faces.map((f) => ({ ...f, ...matchOne(engine, f.embedding, index) }));
-  const seen = new Set();
+  const now = Date.now(), seen = new Set();
   for (const r of results) {
     if (r.attendee && r.similarity >= THRESHOLD) { seen.add(r.attendee.id); votes.set(r.attendee.id, (votes.get(r.attendee.id) || 0) + 1); }
   }
   for (const id of [...votes.keys()]) if (!seen.has(id)) votes.delete(id);
+  for (const id of seen) if (snoozed.has(id)) snoozed.set(id, now);
+  for (const [id, at] of snoozed) if (now - at > GONE_MS) snoozed.delete(id);
+  if (shown && seen.has(shown.id)) lastSeenShown = now;
   let bestId = null, bestVotes = 0;
-  for (const [id, v] of votes) if (v > bestVotes) { bestVotes = v; bestId = id; }
-  if (bestId && bestVotes >= VOTES_NEEDED && (!shown || shown.id !== bestId)) {
+  for (const [id, v] of votes) if (!snoozed.has(id) && v > bestVotes) { bestVotes = v; bestId = id; }
+  // the card stays on the person you are pointing at; it moves to someone else only once they leave the frame
+  if (bestId && bestVotes >= VOTES_NEEDED && (!shown || (shown.id !== bestId && !seen.has(shown.id)))) {
     const r = results.find((x) => x.attendee?.id === bestId); showCard(r.attendee, r.similarity);
   }
-  if (shown && Date.now() - lastShownAt > 8000 && !votes.has(shown.id)) { $('sheet').classList.remove('show'); shown = null; shownId = null; }
+  if (shown && !sheetTouched && !hauntSent && now - lastSeenShown > AUTO_CLOSE_MS) closeCard(false);
   draw(source, results);
+  if (source === $('video')) guide(results);
   return results;
+}
+
+function guide(results) {
+  if (shown) return hint('');
+  if (!results.length) return hint('Point at a face');
+  const known = results.filter((r) => r.attendee && r.similarity >= THRESHOLD);
+  if (known.some((r) => !snoozed.has(r.attendee.id))) return hint('Hold steady…');
+  if (known.length) return hint(`Tap to reopen ${firstName(known[0].attendee.name)}`);
+  if (results.some((r) => r.attendee && r.similarity >= ABSTAIN)) return hint('Not sure. Get a little closer');
+  return hint(results.length > 1 ? 'Unknown faces' : 'Unknown face');
 }
 
 function draw(source, results) {
@@ -65,13 +132,20 @@ function draw(source, results) {
   if (c.width !== sw || c.height !== sh) { c.width = sw; c.height = sh; }
   const ctx = c.getContext('2d'); ctx.clearRect(0, 0, c.width, c.height);
   if (source !== v) ctx.drawImage(source, 0, 0, sw, sh);
-  ctx.lineWidth = Math.max(2, sw / 200); ctx.font = `${Math.max(14, sw / 30)}px sans-serif`;
+  const fs = Math.round(Math.max(16, sw / 24));
+  ctx.lineWidth = Math.max(3, sw / 160); ctx.font = `600 ${fs}px -apple-system, system-ui, sans-serif`;
+  // the canvas is object-fit: cover, so work out which part of it is on screen; labels stay inside that and below the HUD pills
+  const W = c.clientWidth || sw, H = c.clientHeight || sh, k = Math.max(W / sw, H / sh), offX = (sw * k - W) / 2, offY = (sh * k - H) / 2;
+  const minX = offX / k, maxX = (offX + W) / k, minY = (offY + 48) / k;
   for (const r of results) {
     const [x, y, w, h] = r.box;
     const matched = r.attendee && r.similarity >= THRESHOLD; const maybe = r.attendee && r.similarity >= ABSTAIN;
-    ctx.strokeStyle = matched ? '#7CFF6B' : maybe ? '#ffb347' : '#9a93ad'; ctx.strokeRect(x, y, w, h);
+    const color = matched ? '#7CFF6B' : maybe ? '#ffb347' : '#c9c3d6';
+    ctx.strokeStyle = color; ctx.strokeRect(x, y, w, h);
     const label = matched ? `${r.attendee.name} ${(r.similarity * 100).toFixed(0)}%` : maybe ? `? ${(r.similarity * 100).toFixed(0)}%` : 'unknown';
-    ctx.fillStyle = '#000a'; ctx.fillRect(x, y - 24, ctx.measureText(label).width + 10, 24); ctx.fillStyle = ctx.strokeStyle; ctx.fillText(label, x + 5, y - 6);
+    const tw = ctx.measureText(label).width + 14, th = fs + 12;
+    const lx = Math.max(minX, Math.min(x, maxX - tw)), ly = y - th >= minY ? y - th : Math.max(minY, y + 4);
+    ctx.fillStyle = '#000c'; ctx.fillRect(lx, ly, tw, th); ctx.fillStyle = color; ctx.fillText(label, lx + 7, ly + th - 8);
   }
 }
 
@@ -84,8 +158,16 @@ async function pickRearCamera() {
   } catch {}
   return { video: { facingMode: { ideal: 'environment' }, ...base }, audio: false };
 }
+const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+function cameraHelp(e) {
+  if (!navigator.mediaDevices?.getUserMedia) return 'This page needs HTTPS to use the camera. Open the https:// link.';
+  if (e?.name === 'NotAllowedError') return ios ? 'Camera is blocked. Tap aA in the address bar, then Website Settings, Camera, Allow. Then try again.' : 'Camera is blocked. Tap the icon left of the address, then Permissions, Camera, Allow. Then try again.';
+  if (e?.name === 'NotReadableError') return 'Another app is using the camera. Close it and try again.';
+  if (e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') return 'No camera found on this device.';
+  return `Camera error: ${e?.message || e}`;
+}
 
-let frames = 0, t0 = 0;
+let frames = 0;
 async function loop() {
   if (!running) return;
   const v = $('video');
@@ -96,20 +178,32 @@ async function loop() {
   }
   setTimeout(loop, 120); // ~4 fps target; detection itself takes most of it
 }
-$('start').onclick = async () => {
-  unlockAudio(); wakeLock();
+async function start() {
+  if (running || !engine) return;
+  wantRunning = true; $('start').disabled = true; $('idle-sub').textContent = 'Opening the camera…';
   try {
     stream = await navigator.mediaDevices.getUserMedia(await pickRearCamera());
     $('video').srcObject = stream; await $('video').play().catch(() => {});
-    $('start').hidden = true; running = true; loop();
-  } catch (e) { status('Camera blocked: ' + e.message); }
-};
-document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) { running = false; stream?.getTracks().forEach((t) => t.stop()); stream = null; $('start').hidden = false; $('start').textContent = 'Resume hunting'; }
+    $('idle').hidden = true; running = true; wakeLock();
+    $('hud-state').innerHTML = '<span class="dot"></span>Scanning'; hint('Point at a face');
+    loop();
+  } catch (e) {
+    wantRunning = false; $('idle').hidden = false; $('start').disabled = false; $('start').textContent = 'Try again';
+    $('idle-sub').textContent = cameraHelp(e); status('Camera blocked: ' + e.message);
+  }
+}
+// camera already allowed on this phone (a return visit): start without the extra tap
+async function autoStart() { try { if ((await navigator.permissions?.query({ name: 'camera' }))?.state === 'granted') start(); } catch {} }
+$('start').onclick = () => { unlockAudio(); start(); };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (running) { running = false; stream?.getTracks().forEach((t) => t.stop()); stream = null; $('hud-state').textContent = ''; hint(''); }
+  } else if (wantRunning && !running) { $('start').textContent = 'Resume hunting'; start(); } // back from another app: pick up where you were
 });
 // test hook: run a photo through the same pipeline VOTES_NEEDED times so the card logic is exercised
 $('testfile').onchange = async (e) => {
   const file = e.target.files[0]; if (!file || !engine) return;
+  $('idle').hidden = true;
   const img = await imageFromFile(file); let r = [];
   for (let i = 0; i < VOTES_NEEDED; i++) r = await processFrame(img);
   status(r.length ? r.map((x) => `${x.attendee ? x.attendee.name : 'nobody'} ${(x.similarity * 100).toFixed(0)}%`).join(' | ') : 'no faces in photo');
