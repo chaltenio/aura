@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo 'TEAM BUS (last 12 messages; post with scripts/bus.sh post|claim|ask):' && scripts/bus.sh read 12 2>/dev/null; echo; echo 'TODO.md STATUS:'; sed -n '/^## STATUS/,/^## Now/p' TODO.md | sed '1d;$d'"
+          }
+        ]
+      }
+    ]
+  }
+}

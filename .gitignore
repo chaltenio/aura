@@ -41,3 +41,6 @@ data/
 
 # integrator state
 .integrator-last
+
+# team bus local state
+.bus/
