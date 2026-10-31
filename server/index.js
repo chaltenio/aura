@@ -145,18 +145,20 @@ app.patch('/api/attendee/:id', (req, res) => {
 // haunt: actor found target
 const lastHaunt = new Map(); // `${actor}:${target}` -> ts
 app.post('/api/haunt', (req, res) => {
-  const { actorId, token, targetId, similarity } = req.body || {};
+  const { actorId, token, targetId, similarity } = req.body || {}; const back = req.body?.back === true;
   const actor = byId(actorId); const target = byId(targetId);
   if (!actor || actor.token !== token) return res.status(403).json({ error: 'forbidden' });
   if (!target || !target.consent) return res.status(404).json({ error: 'target not findable' });
   if (actor.id === target.id) return res.status(400).json({ error: 'cannot haunt yourself' });
+  // haunt back: only toward someone who haunted you first (checked before the cooldown, so a refusal costs nothing)
+  if (back && !db.events.some((e) => e.type === 'haunt' && e.actorId === target.id && e.targetId === actor.id)) return res.status(400).json({ error: 'nothing to haunt back' });
   const key = `${actor.id}:${target.id}`;
   const now = Date.now();
   if (now - (lastHaunt.get(key) || 0) < HAUNT_COOLDOWN_MS) return res.status(429).json({ error: 'cooldown', card: publicCard(target) });
   lastHaunt.set(key, now);
-  const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now };
+  const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now, ...(back && { back: true }) };
   db.events.push(ev); save();
-  sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now });
+  sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now, ...(back && { back: true }) });
   broadcastScreen({ type: 'event', event: { ...ev, actor: publicCard(actor), target: publicCard(target) } });
   res.json({ ok: true, card: publicCard(target) });
 });

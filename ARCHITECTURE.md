@@ -164,9 +164,9 @@ on a `gallery_changed` socket message).
 | PATCH | `/api/attendee/me` | `{consent}` kill switch |
 | GET | `/api/gallery` | `[{id, name, handle, descriptors}]` for consenting attendees only. Avatars are a separate lazy endpoint |
 | GET | `/api/attendee/:id/card` | name, handle, avatar URL, blurb, GitHub "this week" summary |
-| POST | `/api/haunt` | `{targetId, similarity}` -> writes event, pushes `haunted` to target socket, returns the target card |
+| POST | `/api/haunt` | `{targetId, similarity, back?}` -> writes event, pushes `haunted` to target socket, returns the target card. Optional `back: true` is a haunt back: it needs an earlier haunt from the target to you (else 400 `nothing to haunt back`); the event stays `type: 'haunt'` and carries `back: true` |
 | GET | `/api/me/:id?token=` | 403 on a bad token. `{me, received, given, connections}`: `me` is your public card; `received` = haunts on you, each with `by` (actor card); `given` = your haunts, each with `target` (target card); `connections` = one row per person you haunted or who haunted you, `{card, youHaunted, hauntedYou, lastAt}`. All newest first. Consenting counterparts only: someone who opts out (or is gone) drops out of all three |
-| WS | `/ws?attendee=<id>` | server -> phone: `haunted`, `gallery_changed`, `state` (roles/scores) |
+| WS | `/ws?attendee=<id>` | server -> phone: `haunted` (`{by, at}`, plus `back: true` for a haunt back), `gallery_changed`, `state` (roles/scores) |
 
 Rate-limit haunts per pair (one per 60 s) so a phone pointed at someone does not
 spam them.
