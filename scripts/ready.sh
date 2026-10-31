@@ -30,7 +30,7 @@ git fetch -q origin
 if [[ -z "$(git rev-list origin/main..HEAD)" ]]; then echo "ready: $branch has nothing that main lacks; nothing to land."; exit 0; fi
 summary=${summary#"$branch: "}
 if [[ -z "$summary" ]]; then
-  summary=$(git log --no-merges --format=%s origin/main..HEAD | grep -v -E '^(todo|integration log|integrator):' | head -1 || true)
+  summary=$(git log --reverse --no-merges --format=%s origin/main..HEAD | grep -v -E '^(todo|integration log|integrator):' | head -1 || true)
   summary=${summary:-$branch}
 fi
 

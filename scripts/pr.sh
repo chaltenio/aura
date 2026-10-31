@@ -24,7 +24,7 @@ if ! git show-ref --verify --quiet "refs/remotes/origin/$b"; then echo "pr: orig
 range="origin/main..origin/$b"
 if [[ -z "$(git rev-list "$range")" ]]; then echo "pr: origin/$b has nothing that main lacks" >&2; exit 1; fi
 if [[ -z "$title" ]]; then
-  title=$(git log --no-merges --format=%s "$range" | grep -v -E '^(todo|integration log|integrator):' | head -1 || true)
+  title=$(git log --reverse --no-merges --format=%s "$range" | grep -v -E '^(todo|integration log|integrator):' | head -1 || true)
   title=${title:-$b}
 fi
 commits=$(git rev-list --count --no-merges "$range")
