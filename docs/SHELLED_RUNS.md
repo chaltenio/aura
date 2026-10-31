@@ -98,6 +98,45 @@ overlay, toasts) or triggers scrollbars, and nobody able to feel whether the pat
 
 ---
 
+## Run 4: Possession effects (everything else iOS Safari will let a page do)
+
+Builds on Run 3. Foreground page only: iOS freezes JS and drops the socket when the phone
+locks, so none of this works from a pocket. Proposed by tarecq 15:30; see IDEAS.md section 3.
+
+```
+Read web/common.js, web/me.js, web/hunt.js, web/app.css, RESEARCH.md section A (phone-side effects).
+
+Make a haunt feel like a possession on iPhone and Android, in common.js and app.css, all
+triggered from the existing hauntedAlert path and all off under prefers-reduced-motion:
+
+(1) Beat the ringer switch: if navigator.audioSession exists, set its type to "playback" on
+the Join tap so Web Audio plays with the mute switch on; feature-detect, never throw.
+(2) A voice: with speechSynthesis, whisper the hunter's first name in a slow low-pitch English
+voice ("<name>... I see you"), rate 0.7, pitch 0.3, after the shriek; pan it left to right with a
+StereoPannerNode when the audio graph allows, skip silently when no voices are loaded.
+(3) The browser turns red: swap <meta name="theme-color"> to #7a0000 for 2 s with the flash,
+then restore; create the tag if the page has none.
+(4) The page decays: a 3 s body-level CSS animation (hue-rotate toward green, a blur pulse,
+a brief invert, letter-spacing glitch on headings) that leaves the page exactly as it was.
+(5) Shake to haunt back: after DeviceMotionEvent.requestPermission() granted inside the Join
+tap (iOS) or available without it (Android), a shake over a threshold within 20 s of being
+haunted POSTs /api/haunt back at the hunter (actorId me, targetId hunter) and shows "You
+haunted them back". Debounce so one shake is one haunt; the server cooldown still applies.
+(6) Add all of it to the "Test my alert" button on /me.
+
+Do not open the camera, do not add permissions beyond motion, do not change server code.
+Keep every effect working when any single API is missing.
+```
+
+Expect: audioSession typed wrong or set too late, speechSynthesis voices empty on first call,
+theme-color only updating on some iOS versions, body filters breaking fixed-position overlays,
+shake thresholds nobody can tune without a phone in hand, and the retaliation haunt hitting the
+60 s pair cooldown.
+
+Parked for a later run, each needs camera or is a gamble: front-camera "look behind you" with a
+ghost over your shoulder (on-device only), rear torch strobe via the track torch constraint,
+tilt-parallax ghost on DeviceOrientation.
+
 ## After each run
 
 1. In the PR description add `Shelled run: <link or id>`.

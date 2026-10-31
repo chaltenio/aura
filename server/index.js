@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mountAuth, sessionProfile } from './auth.js';
 import { ensureProfile } from './profile.js';
+import { mountAdmin } from './admin.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -62,6 +63,7 @@ app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
 if (process.env.DEBUG_FIXTURES) app.use('/__fixtures', express.static(DATA_DIR)); // local debugging only
 
 mountAuth(app);
+const admin = mountAdmin(app, { db, byId, save, sendTo, broadcast, broadcastScreen, isOnline: (id) => [...(sockets.get(id) || [])].some((ws) => ws.readyState === 1) });
 
 // register. A signed-in session (GitHub/LinkedIn/Google/Apple) supplies provider, id, avatar and defaults; otherwise 'manual' or 'csv'.
 app.post('/api/attendee', (req, res) => {
@@ -97,7 +99,7 @@ app.post('/api/attendee', (req, res) => {
 app.get('/api/version', (_req, res) => res.json({ version: process.env.APP_VERSION || 'dev', startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length }));
 
 app.get('/api/gallery', (_req, res) => {
-  res.json(db.attendees.filter((a) => a.consent).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
+  res.json(db.attendees.filter((a) => a.consent && !a.blocked).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
 });
 
 app.get('/api/attendee/:id', async (req, res) => {
@@ -146,12 +148,13 @@ app.post('/api/haunt', (req, res) => {
   const { actorId, token, targetId, similarity } = req.body || {}; const back = req.body?.back === true;
   const actor = byId(actorId); const target = byId(targetId);
   if (!actor || actor.token !== token) return res.status(403).json({ error: 'forbidden' });
-  if (!target || !target.consent) return res.status(404).json({ error: 'target not findable' });
+  if (actor.blocked) return res.status(403).json({ error: 'blocked' });
+  if (!target || !target.consent || target.blocked) return res.status(404).json({ error: 'target not findable' });
   if (actor.id === target.id) return res.status(400).json({ error: 'cannot haunt yourself' });
   // haunt back: only toward someone who haunted you first
   if (back && !db.events.some((e) => e.type === 'haunt' && e.actorId === target.id && e.targetId === actor.id)) return res.status(400).json({ error: 'nothing to haunt back' });
   const now = Date.now();
-  const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now, ...(back && { back: true }) };
+  const ev = { id: db.events.length + 1, type: 'haunt', actorId: actor.id, targetId: target.id, similarity: Number(similarity) || null, createdAt: now, meetupId: admin.activeMeetup()?.id || null, ...(back && { back: true }) };
   db.events.push(ev); save();
   sendTo(target.id, { type: 'haunted', by: publicCard(actor), at: now, ...(back && { back: true }) });
   broadcastScreen({ type: 'event', event: { ...ev, actor: publicCard(actor), target: publicCard(target) } });
@@ -161,7 +164,7 @@ app.post('/api/haunt', (req, res) => {
 app.get('/api/events', (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 500);
   const events = db.events.slice(-limit).reverse().map((e) => ({ ...e, actor: publicCard(byId(e.actorId) || { id: '?', name: 'unknown' }), target: publicCard(byId(e.targetId) || { id: '?', name: 'unknown' }) }));
-  res.json({ events, attendees: db.attendees.filter((a) => a.consent).map(publicCard) });
+  res.json({ events, attendees: db.attendees.filter((a) => a.consent && !a.blocked).map(publicCard) });
 });
 
 // ---------- websockets ----------
