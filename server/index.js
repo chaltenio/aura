@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mountAuth, sessionProfile } from './auth.js';
+import { ensureProfile } from './profile.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -48,7 +49,7 @@ function save() {
 }
 const byId = (id) => db.attendees.find((a) => a.id === id);
 const publicCard = (a) => ({
-  id: a.id, name: a.name, handle: a.handle || '', blurb: a.blurb || '', linkedin: a.linkedin || '',
+  id: a.id, name: a.name, handle: a.handle || '', blurb: a.blurb || '', linkedin: a.linkedin || '', profile: a.profile && !a.profile.error ? a.profile : null,
   avatar: a.avatar || null, consent: !!a.consent,
   hauntedCount: db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).length,
   huntCount: db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).length,
@@ -86,6 +87,7 @@ app.post('/api/attendee', (req, res) => {
     createdAt: Date.now(),
   };
   db.attendees.push(a); save();
+  ensureProfile(a, save, 0).catch(() => {}); // warm the GitHub profile cache in the background
   broadcast({ type: 'gallery_changed' });
   broadcastScreen({ type: 'joined', attendee: publicCard(a) });
   res.json({ id: a.id, token: a.token });
@@ -96,16 +98,18 @@ app.get('/api/gallery', (_req, res) => {
   res.json(db.attendees.filter((a) => a.consent).map((a) => ({ id: a.id, name: a.name, descriptors: a.descriptors })));
 });
 
-app.get('/api/attendee/:id', (req, res) => {
+app.get('/api/attendee/:id', async (req, res) => {
   const a = byId(req.params.id);
   if (!a) return res.status(404).json({ error: 'not found' });
+  await ensureProfile(a, save).catch(() => {});
   res.json(publicCard(a));
 });
 
 // me: card + haunts, needs token
-app.get('/api/me/:id', (req, res) => {
+app.get('/api/me/:id', async (req, res) => {
   const a = byId(req.params.id);
   if (!a || a.token !== req.query.token) return res.status(403).json({ error: 'forbidden' });
+  await ensureProfile(a, save).catch(() => {});
   const received = db.events.filter((e) => e.type === 'haunt' && e.targetId === a.id).map((e) => ({ ...e, by: publicCard(byId(e.actorId) || { id: '?', name: 'unknown' }) }));
   const given = db.events.filter((e) => e.type === 'haunt' && e.actorId === a.id).map((e) => ({ ...e, target: publicCard(byId(e.targetId) || { id: '?', name: 'unknown' }) }));
   res.json({ me: publicCard(a), received: received.reverse(), given: given.reverse() });
@@ -117,6 +121,8 @@ app.patch('/api/attendee/:id', (req, res) => {
   if (!a || a.token !== req.body?.token) return res.status(403).json({ error: 'forbidden' });
   if (typeof req.body.consent === 'boolean') a.consent = req.body.consent;
   if (typeof req.body.blurb === 'string') a.blurb = req.body.blurb.trim().slice(0, 200);
+  if (typeof req.body.handle === 'string') { a.handle = req.body.handle.trim().replace(/^@/, '').slice(0, 60); a.profile = null; ensureProfile(a, save, 0).catch(() => {}); }
+  if (typeof req.body.linkedin === 'string') a.linkedin = /^https?:\/\/(www\.)?linkedin\.com\//.test(req.body.linkedin) ? req.body.linkedin.slice(0, 200) : '';
   save();
   broadcast({ type: 'gallery_changed' });
   res.json(publicCard(a));

@@ -1,5 +1,5 @@
 import { loadEngine, buildIndex, matchOne, imageFromFile, THRESHOLD, ABSTAIN, ENGINE } from '/face.js';
-import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, esc } from '/common.js';
+import { api, getMe, connectWs, unlockAudio, hauntedAlert, wakeLock, esc, renderProfile } from '/common.js';
 
 const $ = (id) => document.getElementById(id);
 const status = (t) => { $('status').textContent = t; };
@@ -20,6 +20,7 @@ function renderCard(att, sim) {
   $('c-name').textContent = att.name; $('c-handle').textContent = att.handle ? '@' + att.handle : ''; $('c-blurb').textContent = att.blurb || '';
   $('c-sim').textContent = `match ${(sim * 100).toFixed(0)}%`;
   if (att.avatar) { $('c-avatar').src = att.avatar; $('c-avatar').hidden = false; $('c-noavatar').hidden = true; } else { $('c-avatar').hidden = true; $('c-noavatar').hidden = false; }
+  $('c-profile').innerHTML = renderProfile(att);
 }
 function showCard(att, sim) {
   const changed = shownId !== att.id;

@@ -48,7 +48,7 @@ $('files').onchange = async (e) => {
 $('submit').onclick = async () => {
   $('submit').disabled = true; status('Registering…');
   try {
-    const body = { name: $('name').value.trim(), handle: $('handle').value.trim().replace(/^@/, ''), blurb: $('blurb').value.trim(), consent: $('consent').checked, descriptors: descriptors.slice(0, 5), avatar };
+    const body = { name: $('name').value.trim(), handle: $('handle').value.trim().replace(/^@/, ''), blurb: $('blurb').value.trim(), linkedin: $('linkedin').value.trim(), consent: $('consent').checked, descriptors: descriptors.slice(0, 5), avatar };
     const { id, token } = await api('/api/attendee', { method: 'POST', body });
     setMe({ id, token, name: body.name });
     stream?.getTracks().forEach((t) => t.stop());

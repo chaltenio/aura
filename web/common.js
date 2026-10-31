@@ -69,3 +69,28 @@ export function hauntedAlert(msg) {
 export async function wakeLock() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch {} }
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/** HTML for the public profile block of a card (GitHub enrichment + LinkedIn link). Safe to inject. */
+export function renderProfile(card) {
+  if (!card) return '';
+  const p = card.profile; const bits = [];
+  if (p) {
+    if (p.bio) bits.push(`<div class="p-bio">${esc(p.bio)}</div>`);
+    const meta = [p.company, p.location].filter(Boolean).map(esc).join(' · ');
+    if (meta) bits.push(`<div class="p-meta">${meta}</div>`);
+    const stats = [];
+    if (p.pushesThisWeek != null) stats.push(`<b>${p.pushesThisWeek}</b> push${p.pushesThisWeek === 1 ? '' : 'es'} this week`);
+    if (p.followers != null) stats.push(`<b>${p.followers}</b> followers`);
+    if (p.publicRepos != null) stats.push(`<b>${p.publicRepos}</b> repos`);
+    if (stats.length) bits.push(`<div class="p-stats">${stats.join(' · ')}</div>`);
+    if (p.activeRepos?.length) bits.push(`<div class="p-meta">Working on: ${p.activeRepos.map((r) => `<a href="https://github.com/${esc(r)}" target="_blank" rel="noopener">${esc(r.split('/').pop())}</a>`).join(', ')}</div>`);
+    if (p.recentRepos?.length) bits.push(`<ul class="p-repos">${p.recentRepos.slice(0, 3).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>${r.language ? ` <span class="mute">${esc(r.language)}</span>` : ''}${r.description ? `<div class="mute">${esc(r.description).slice(0, 90)}</div>` : ''}</li>`).join('')}</ul>`);
+  }
+  const links = [];
+  if (p?.url) links.push(`<a href="${esc(p.url)}" target="_blank" rel="noopener">GitHub</a>`);
+  else if (card.handle) links.push(`<a href="https://github.com/${esc(card.handle)}" target="_blank" rel="noopener">GitHub</a>`);
+  if (card.linkedin) links.push(`<a href="${esc(card.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>`);
+  if (p?.blog) links.push(`<a href="${esc(/^https?:/.test(p.blog) ? p.blog : 'https://' + p.blog)}" target="_blank" rel="noopener">Site</a>`);
+  if (links.length) bits.push(`<div class="p-links">${links.join(' · ')}</div>`);
+  return bits.length ? `<div class="profile">${bits.join('')}</div>` : '';
+}

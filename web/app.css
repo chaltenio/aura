@@ -47,3 +47,13 @@ button:disabled { opacity:.45; }
 @media (min-width: 900px) { .screen-grid { display:grid; grid-template-columns: 1.2fr 1fr; gap: 24px; } body.screen { max-width: 1400px; } }
 .qr svg { width: 100%; max-width: 280px; height:auto; background:#fff; padding: 8px; border-radius: 12px; }
 .hint { font-size: 13px; color: var(--mute); }
+.profile { margin-top: 10px; padding-top: 10px; border-top: 1px solid #2a2738; font-size: 14px; }
+.profile .p-bio { color: var(--ink); margin-bottom: 4px; }
+.profile .p-meta { color: var(--mute); margin: 2px 0; }
+.profile .p-stats { margin: 6px 0; color: var(--mute); }
+.profile .p-stats b { color: var(--ok); }
+.profile .p-repos { list-style: none; padding: 0; margin: 6px 0; }
+.profile .p-repos li { padding: 4px 0; border-top: 1px dashed #2a2738; }
+.profile .p-links { margin-top: 8px; }
+.profile .p-links a { font-weight: 600; margin-right: 6px; }
+.sheet { max-height: 70vh; overflow-y: auto; }
