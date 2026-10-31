@@ -6,3 +6,4 @@ Format: `- YYYY-MM-DD HH:MM  <new commits since last pass> | test: pass/fail | <
 
 ---
 - 2026-10-31T20:25Z main-session: merged main-session/core (FaceX hybrid engine default, OAuth sign-in behind env vars, smoke test, Dockerfile/fly.toml, doc fixes) into main, npm test green
+- 2026-10-31T20:27Z main-session: merged devops/deploy (Fly deploy script, SOPS+age secrets, .mcp.json, CI/CD, DEPLOY/SECRETS docs) into main
