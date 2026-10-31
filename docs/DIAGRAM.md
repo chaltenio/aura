@@ -19,8 +19,8 @@ from a Cloudflare quick tunnel in front of `localhost:3000`.
 
 The dashed green box is the privacy boundary: everything inside it runs on the attendee's phone.
 The engine is picked per page load with `?engine=facex` or `?engine=human` (the match threshold
-follows the engine, override with `?t=`). The code's `DEFAULT_ENGINE` is `human` until FaceX has
-been validated on phones; the FaceX path reuses Human's detector and landmarks for alignment.
+follows the engine, override with `?t=`). The code default is FaceX; Human's FaceRes stays as the
+fallback behind `?engine=human`. The FaceX path reuses Human's detector and landmarks for alignment.
 
 ```mermaid
 flowchart LR
@@ -36,8 +36,8 @@ flowchart LR
     subgraph engine["face.js: on-device face engine"]
       direction TB
       det["Human BlazeFace detector<br/>+ FaceMesh 468 landmarks<br/>tfjs wasm backend, 320 px input"]
-      fx["FaceX path (?engine=facex)<br/>5 keypoints from mesh, align.js warp to 112x112<br/>EdgeFace-XS wasm embedder, 512-d"]
-      hres["Human path (?engine=human, code default)<br/>FaceRes description, 1024-d<br/>human.match.find"]
+      fx["FaceX path (default, ?engine=facex)<br/>5 keypoints from mesh, align.js warp to 112x112<br/>EdgeFace-XS wasm embedder, 512-d"]
+      hres["Human path (fallback, ?engine=human)<br/>FaceRes description, 1024-d<br/>human.match.find"]
       match["matchOne(): cosine vs gallery index<br/>THRESHOLD facex 0.4 / human 0.5<br/>ABSTAIN = THRESHOLD - 0.1<br/>same-length descriptors only"]
       det --> fx --> match
       det --> hres --> match
