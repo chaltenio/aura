@@ -47,6 +47,7 @@ data/
 
 # secrets: only secrets/*.enc.env (SOPS-encrypted) may be committed
 *.key
+*.p8
 secrets/*.env
 !secrets/*.enc.env
 age-key*.txt
