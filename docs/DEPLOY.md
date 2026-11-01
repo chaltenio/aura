@@ -74,7 +74,8 @@ The URL changes on every restart and dies with the laptop, so use it for phone t
 ## What runs where
 
 - One machine, `PORT=3000`, `DATA_DIR=/data` (the volume). The JSON store is `/data/db.json`; delete it after the event.
-- The machine stops when nobody is connected and the next visit starts it (a cold start of a second or two).
+- The machine stops about 5 minutes after the last connection closes; the next visit starts it and waits about 4 seconds
+  (measured 2026-11-01: stopped by the proxy 6 minutes after a deploy, first page 3.9 s, then 46 ms).
 - FaceX weights are baked into the image at build time (Dockerfile), so cold starts do not download anything.
 - Secrets reach the app as Fly secrets (`fly secrets list -a aura-haunt`), never as files in the image.
 

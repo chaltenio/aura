@@ -17,8 +17,8 @@ primary_region = "sjc"
 [http_service]
   internal_port = 3000
   force_https = true
-  # Cost cap: the one machine stops when nobody is connected and the next visit starts it again (a cold start of a
-  # second or two; an open page keeps it awake). An idle month costs cents; awake all month it is about $4.41 in sjc.
+  # Cost cap: the one machine stops ~5 minutes after the last connection closes and the next visit starts it again (that
+  # visit waits about 4 s; an open page keeps it awake). An idle month costs cents; awake all month it is about $4.41 in sjc.
   # Machines are never added automatically, so with the bandwidth cap a month cannot pass about $6 (docs/DEPLOY.md).
   auto_stop_machines = "stop"
   auto_start_machines = true
