@@ -2,7 +2,7 @@
 
 Host: **Fly.io** (one Node machine, WebSockets, a 1 GB volume for `data/`, HTTPS at `https://aura-haunt.fly.dev`).
 Why Fly over Railway/Render: the Dockerfile and `fly.toml` already exist, Fly builds remotely (no local Docker),
-WebSockets and persistent volumes work on the cheapest machine (shared-cpu-1x, about $2 to 3 a month), and the
+WebSockets and persistent volumes work on the cheapest machine (shared-cpu-1x; see "Costs and caps"), and the
 whole deploy is one CLI command. Railway is the fallback (needs a card too; `railway up`). Render's free tier
 sleeps and has no disk, so it is out for a live event.
 
@@ -74,8 +74,44 @@ The URL changes on every restart and dies with the laptop, so use it for phone t
 ## What runs where
 
 - One machine, `PORT=3000`, `DATA_DIR=/data` (the volume). The JSON store is `/data/db.json`; delete it after the event.
+- The machine stops when nobody is connected and the next visit starts it (a cold start of a second or two).
 - FaceX weights are baked into the image at build time (Dockerfile), so cold starts do not download anything.
 - Secrets reach the app as Fly secrets (`fly secrets list -a aura-haunt`), never as files in the image.
+
+## Costs and caps
+
+Fly has no spending limit, so the caps are in `fly.toml` and the server. Nothing else the app uses bills by usage.
+
+| Service | Runs | Cap | Worst month |
+|---|---|---|---|
+| Fly `aura-haunt` | one shared-cpu-1x 512 MB machine in sjc, 1 GB volume | the machine stops when idle and Fly never adds machines by itself (`fly.toml`); outbound data stops at `BANDWIDTH_CAP_GB` = 10 GB a month (`server/bandwidth.js`, 503 past it until the 1st) | machine awake all month $4.41 + volume $0.15 + 10 GB of data $0.20 (North America, Europe) to $1.20 (Africa, India): **under $6** |
+| Fly builds | remote builder on each deploy | Fly: "There's currently no charge for builders" | $0 |
+| Base44 mirror | static copy of `web/` | billed by plan, not traffic; the mirror calls no Base44 integrations, so it uses no credits | $0 on the Free plan |
+| GitHub Actions | `ci`, `deploy` | public repo, standard runners are free | $0 |
+| Anthropic, ElevenLabs, ASI:One, TrueFoundry | nothing: no server code calls them and none is set on Fly | wire one only after setting a monthly limit at the provider and a per-day call cap in the server | $0 |
+| LinkedIn, GitHub, Google sign-in; GitHub API | sign-in, profile lookups | free | $0 |
+
+Fly prices used: shared-cpu-1x 512 MB in sjc ~$0.0060/hour ($4.41/month), volumes and stopped-machine root
+filesystems $0.15/GB-month, data out $0.02/GB (North America, Europe), $0.04 (Asia Pacific, Oceania, South America),
+$0.12 (Africa, India), inbound free, shared IPv4 and IPv6 free (docs.fly.io/about/pricing, November 2026).
+
+**Cost so far** (2026-10-31 21:03 UTC, when the app was created, to 2026-11-01 22:00 UTC; from Fly's metrics): machine
+~25 hours, $0.15; volume $0.01; data out 0.56 GB in 5,621 responses, 97% of it to North America, $0.01; builds and
+IPs $0. About **$0.17**.
+
+Check it:
+- `curl -s https://aura-haunt.fly.dev/api/version | jq .bandwidth`: this month's data against the cap.
+- `fly machine list -a aura-haunt`: `started` or `stopped`.
+- The bill itself: fly.io/dashboard → Billing. Data out per region: fly-metrics.net (Fly's Grafana), or Fly's
+  Prometheus API (`https://api.fly.io/prometheus/<org raw slug>/api/v1/query`, header `Authorization: FlyV1 <fly auth
+  token>`, not `Bearer`; query `sum by (region) (increase(fly_edge_data_out{app="aura-haunt"}[30d]))`).
+
+Change it:
+- More data for a bigger event: raise `BANDWIDTH_CAP_GB` in `fly.toml` (each GB is at most $0.12) and merge.
+- Always warm for a live event: `min_machines_running = 1` in `fly.toml` for the night (the machine stays up, $0.15 a
+  day), back to `0` after.
+- Off entirely: `fly scale count 0 -a aura-haunt` (the volume and its data stay, $0.15 a month); `fly scale count 1`
+  brings it back. `fly apps destroy aura-haunt` ends every charge and deletes the data.
 
 ## MCP servers for agents (`.mcp.json`, project scope)
 
