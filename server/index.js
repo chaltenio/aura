@@ -14,6 +14,7 @@ import { deployInfo } from './version.js';
 import { mountPresence } from './presence.js';
 import { mountScout } from './scout.js';
 import { cors } from './cors.js';
+import { bandwidthCap } from './bandwidth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -46,6 +47,7 @@ async function ensureWeights() {
 mkdirSync(DATA_DIR, { recursive: true });
 const VERSION = deployInfo(DATA_DIR); // { version: git sha, deploy: v-number (+1 per deploy), deployedAt }
 console.log(VERSION.deploy ? `deploy v${VERSION.deploy} (${VERSION.version})` : `${VERSION.version} build (no deploy number)`);
+const bandwidth = bandwidthCap(DATA_DIR); // #36: bytes sent this month (data/bandwidth.json); past BANDWIDTH_CAP_GB everything but /api/version is 503
 const db = existsSync(DB_PATH)
   ? JSON.parse(readFileSync(DB_PATH, 'utf8'))
   : { attendees: [], events: [] };
@@ -77,6 +79,7 @@ const cardChanged = (a) => { save(); pushCard(a); }; // a GitHub lookup landed o
 
 // ---------- app ----------
 const app = express();
+app.use(bandwidth.gate); // first in line: past the monthly cap nothing else runs (server/bandwidth.js)
 app.use('/api', cors); // the Base44 mirror of web/ calls the API cross-origin (server/cors.js, FRONTEND_ORIGINS)
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(join(ROOT, 'web'), { extensions: ['html'] }));
@@ -117,8 +120,9 @@ app.post('/api/attendee', (req, res) => {
   res.json({ id: a.id, token: a.token });
 });
 
-// version: git sha, deploy number (one more per deploy, server/version.js) and when it went live, boot time, counts
-app.get('/api/version', (_req, res) => res.json({ ...VERSION, startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length }));
+// version: git sha, deploy number (one more per deploy, server/version.js) and when it went live, boot time, counts,
+// and this month's outbound data against the cap (server/bandwidth.js); still answers past the cap
+app.get('/api/version', (_req, res) => res.json({ ...VERSION, startedAt: STARTED_AT, attendees: db.attendees.length, events: db.events.length, bandwidth: bandwidth.state() }));
 
 // gallery: only consenting attendees, only what matching needs
 app.get('/api/gallery', (_req, res) => {
@@ -198,7 +202,8 @@ app.get('/api/events', (req, res) => {
 
 // ---------- websockets ----------
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+bandwidth.watch(server); // counts every byte written on every socket, HTTP and WebSocket alike
+const wss = new WebSocketServer({ server, path: '/ws', verifyClient: bandwidth.allowSocket }); // past the cap: 503, no socket
 const sockets = new Map(); // attendeeId -> Set<ws>
 const screens = new Set();
 wss.on('connection', (ws, req) => {

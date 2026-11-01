@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deployInfo } from '../server/version.js';
+import { bandwidthMeter } from '../server/bandwidth.js';
 import net from 'node:net';
 import { randomBytes } from 'node:crypto';
 
@@ -46,6 +47,35 @@ try {
     const vercel = deployInfo(dir, { VERCEL: '1', VERCEL_GIT_COMMIT_SHA: '0123456789abcdef' }, 2000);
     check(vercel.version === '0123456' && vercel.deploy === null && vercel.deployedAt === null, `Vercel reports its sha and no number: ${JSON.stringify(vercel)}`);
     check(deployInfo(dir, { VERCEL: '1' }).version === 'dev', 'Vercel without system env vars stays a dev build');
+  }
+  { // bandwidth cap (#36, server/bandwidth.js): bytes sent are counted per UTC month on the volume; past BANDWIDTH_CAP_GB
+    // every request but /api/version gets 503 and new sockets are refused, so a month's data bill has a ceiling
+    const dir = mkdtempSync(join(tmpdir(), 'haunt-bw-'));
+    let t = Date.UTC(2026, 10, 30, 23, 59); const now = () => t;
+    const m = bandwidthMeter(dir, { capGb: 1e-6, now }); // 1,000 bytes
+    m.add(600); const under = !m.over(); m.add(400);
+    check(under && m.over() && m.state().month === '2026-11' && m.state().over === true, `bandwidth: over at the cap, not before: ${JSON.stringify(m.state())}`);
+    m.save();
+    check(bandwidthMeter(dir, { capGb: 1e-6, now }).over(), 'bandwidth: the count survives a restart (data/bandwidth.json)');
+    t = Date.UTC(2026, 11, 1);
+    check(!m.over() && m.state().month === '2026-12' && m.state().usedGb === 0 && !bandwidthMeter(dir, { capGb: 1e-6, now }).over(), 'bandwidth: a new month starts from zero');
+    check(ver.bandwidth?.capGb === 10 && ver.bandwidth.over === false && ver.bandwidth.month === new Date().toISOString().slice(0, 7), `/api/version carries this month's bandwidth: ${JSON.stringify(ver.bandwidth)}`);
+    // a second server with a 20 KB cap: one 45 KB file puts it over
+    const capPort = 5100 + Math.floor(Math.random() * 800), CAP = `http://localhost:${capPort}`;
+    const capped = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(capPort), DATA_DIR: mkdtempSync(join(tmpdir(), 'haunt-cap-')), NO_PROFILE: '1', NO_SCOUT: '1', BANDWIDTH_CAP_GB: '0.00002', BANDWIDTH_TALLY_MS: '50' }, stdio: 'ignore' });
+    try {
+      let up = false;
+      for (let i = 0; i < 100 && !up; i++) { try { up = (await fetch(CAP + '/api/version')).ok; } catch {} if (!up) await new Promise((r) => setTimeout(r, 100)); }
+      const wasm = await fetch(CAP + '/vendor/facex/facex.wasm'); await wasm.arrayBuffer();
+      await new Promise((r) => setTimeout(r, 300)); // a few tallies
+      const page = await fetch(CAP + '/'), api = await fetch(CAP + '/api/gallery');
+      check(up && wasm.ok && page.status === 503 && /bandwidth cap/.test(await page.text()) && Number(page.headers.get('retry-after')) > 0, `bandwidth: past the cap a page gets 503 with Retry-After (${page.status})`);
+      check(api.status === 503 && (await api.json()).error === 'bandwidth cap reached', 'bandwidth: past the cap the API gets 503 JSON');
+      const v = await fetch(CAP + '/api/version'), vb = (await v.json()).bandwidth;
+      check(v.ok && vb?.over === true && vb.usedGb > 0, `bandwidth: /api/version still answers past the cap: ${JSON.stringify(vb)}`);
+      const sock = await new Promise((res) => { const s = new WebSocket(CAP.replace('http', 'ws') + '/ws'); s.addEventListener('open', () => { s.close(); res('open'); }); s.addEventListener('error', () => res('refused')); });
+      check(sock === 'refused', 'bandwidth: past the cap new sockets are refused');
+    } finally { capped.kill(); }
   }
   { // Base44 mirror (#32): CORS for FRONTEND_ORIGINS only; sign-in comes back to the mirror page as #haunt_session, used as a header
     const pre = (origin) => fetch(BASE + '/api/attendee', { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type,x-haunt-session' } });
@@ -291,4 +321,4 @@ try {
 finally { server.kill(); }
 
 if (fails.length) { console.error('SMOKE FAIL\n - ' + fails.join('\n - ')); process.exit(1); }
-console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, scout clues + ratings, static routes, Base44 mirror CORS + sign-in handoff + build)');
+console.log('SMOKE PASS (api, gallery privacy, haunt push, repeat haunts, kill switch, costumes, instant profile pushes, scout clues + ratings, static routes, Base44 mirror CORS + sign-in handoff + build, bandwidth cap)');
