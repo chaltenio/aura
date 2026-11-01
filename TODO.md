@@ -29,7 +29,7 @@ Claim a task by writing your name in Owner **before** you start. Tick it when it
 | 33 | Presence: always see who is on HAUNT right now (a haunt makes their phone shriek) and how many are registered (face known, but a haunt only waits on their card). Header chip on `/hunt`, `/me` and home opens the list; the `/hunt` card says if that person is online; `/screen` shows online now. Server: ws heartbeat, `presence` push, `GET /api/presence` | Matt | [x] |
 | 34 | Vision Pro snap mode: Safari on Apple Vision Pro only lends pages the Persona camera (never the room cameras), so `/hunt` there swaps the dead feed for snap mode: look at someone, screenshot (top button + Digital Crown), Pick photo; faces matched on the headset, card + Haunt as usual | Matt | [x] |
 | 35 | Vercel version: `/api/version` and the home page footer show the git sha on Vercel (`VERCEL_GIT_COMMIT_SHA`), no deploy number (no volume) | Chris | [x] |
-| 36 | Cost caps: the Fly app stops when idle (wakes on the next visit) and stops serving past a monthly bandwidth budget, so a month can not cost more than about $6; costs so far and the caps in docs/DEPLOY.md | Matt | [ ] |
+| 36 | Cost caps: the Fly app stops when idle (wakes on the next visit) and stops serving past a monthly bandwidth budget, so a month can not cost more than about $6; costs so far and the caps in docs/DEPLOY.md | Matt |[x] |
 
 ## Next
 
