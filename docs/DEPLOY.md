@@ -88,6 +88,7 @@ Fly has no spending limit, so the caps are in `fly.toml` and the server. Nothing
 | Fly builds | remote builder on each deploy | Fly: "There's currently no charge for builders" | $0 |
 | Base44 mirror | static copy of `web/` | billed by plan, not traffic; the mirror calls no Base44 integrations, so it uses no credits | $0 on the Free plan |
 | GitHub Actions | `ci`, `deploy` | public repo, standard runners are free | $0 |
+| Vercel `matedevs-projects/aura` (Chris's account) | a build of every push (the PR check "Vercel") | every deployment is behind Vercel Authentication, so the public cannot run up usage; only Chris can see the plan and set limits (Hobby: free, pauses at its limits instead of billing) | $0 to us |
 | Anthropic, ElevenLabs, ASI:One, TrueFoundry | nothing: no server code calls them and none is set on Fly | wire one only after setting a monthly limit at the provider and a per-day call cap in the server | $0 |
 | LinkedIn, GitHub, Google sign-in; GitHub API | sign-in, profile lookups | free | $0 |
 
