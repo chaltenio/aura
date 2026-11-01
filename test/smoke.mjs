@@ -14,7 +14,7 @@ const PORT = 4000 + Math.floor(Math.random() * 1000);
 const BASE = `http://localhost:${PORT}`;
 const DATA_DIR = mkdtempSync(join(tmpdir(), 'haunt-'));
 const MIRROR = 'https://mirror.test'; // stands in for the Base44 mirror's origin (FRONTEND_ORIGINS)
-const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1', SCOUT_SWEEP_MS: '400', SCOUT_MIN_N: '2', PRESENCE_GRACE_MS: '300', PRESENCE_HEARTBEAT_MS: '300' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, [join(ROOT, 'server/index.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR, NO_PROFILE: '1', ADMIN_TOKEN: 'test-admin', APP_VERSION: 'smoke1', FRONTEND_ORIGINS: MIRROR, OAUTH_FAKE: '1', SCOUT_SWEEP_MS: '400', SCOUT_MIN_N: '2', SCOUT_END_AT: new Date(Date.now() + 2 * 3600_000).toISOString(), PRESENCE_GRACE_MS: '300', PRESENCE_HEARTBEAT_MS: '300' }, stdio: ['ignore', 'pipe', 'pipe'] }); // SCOUT_END_AT: the default "18:00" is server-local, already past on UTC runners
 let serverLog = ''; server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 
 const fails = [];
